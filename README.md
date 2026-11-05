@@ -1,24 +1,22 @@
-# Token Diet
+# token-diet
 
-> **Stop silent token bleed.** A zero-dependency CLI watchdog that pinpoints runaway prompt bloat, detects invisible Git pre-commit LLM hooks, and enforces context health budgets across AI coding environments.
+Audit token footprint and detect silent context leaks in AI agent workflows.
 
-Compatible with **Claude Code**, **OpenAI Codex**, **Gemini CLI / Antigravity**, **Cursor**, **Windsurf**, **OpenCode**, and custom AI agent workflows.
+Zero-dependency CLI for **Claude Code**, **Cursor**, **Codex**, **Gemini**, and **OpenCode**.
 
 ---
 
-## What Does Token Diet Do?
+## Why?
 
-Token Diet is **not** a general documentation linter. It is a specialized context-security and cost-control monitor designed to solve the two biggest hidden token drains in AI-assisted development:
+AI coding assistants inject instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) into the system prompt on **every single turn**. A bloated 25 KB prompt file forces the model to re-process ~6,000 tokens on every message, draining rate limits and breaking prompt cache discounts.
 
-1. 🚨 **Catches Invisible Git Hooks:** Inspects `.git/hooks/pre-commit` to alert you if background tools secretly send your code diffs to cloud LLMs on every single local commit.
-2. 🛑 **Detects AI Directive & Prompt Bloat:** Audits active agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `.cursor/rules/*.mdc`) that get injected into the LLM context window on *every conversation turn*, flagging sizes that invalidate prompt caching or exhaust token limits.
-3. 🌐 **Audits Global Workstation Prompts (`--global`):** Scans system-wide assistant prompts (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`) across your machine.
-4. 🛡️ **Automated CI / PR Gatekeeper:** Blocks Pull Requests if someone accidentally commits oversized instruction files or unbudgeted prompt expansions (`--strict`, `--max-tokens <N>`).
-5. ⚡ **Zero External Dependencies:** Built with pure Python standard library (`Python >= 3.8`). Runs in < 10ms with zero runtime dependencies.
+Worse, some local tools install hidden `pre-commit` hooks that send your entire git diff to an LLM on every commit.
 
-> [!IMPORTANT]
-> **Directive Files vs General Documentation**  
-> Unlike regular documentation files (like `docs/api.md` or `guides/`), **agent directive files** (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) are automatically injected by AI assistants into the system prompt on **every single message turn**. A 25 KB instruction file does not just sit in your repo; it forces the LLM to process ~6,200 tokens repeatedly, inflating API bills, hitting hourly rate limits, and degrading reasoning accuracy.
+`token-diet` scans your repository or workstation in milliseconds to:
+- **Audit prompt size:** Flags instruction files that exceed context budgets (`[OK]`, `[WARN]`, `[ALERT]`).
+- **Catch rogue git hooks:** Detects and disables silent LLM review hooks in `.git/hooks/pre-commit` (`--fix-hooks`).
+- **Guard CI pipelines:** Fails PR builds if prompt expansions exceed token thresholds (`--strict`, `--max-tokens`).
+- **Zero dependencies:** Pure Python standard library (Python >= 3.8). Runs in < 10ms.
 
 ---
 
