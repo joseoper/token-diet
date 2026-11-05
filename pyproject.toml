@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "token-diet"
+name = "token-diet-cli"
 version = "0.1.0"
 description = "Diagnostic tools and methodology to audit and optimize token footprint in AI coding workflows"
 readme = "README.md"

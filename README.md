@@ -32,20 +32,16 @@ brew install token-diet
 
 ### Via `pipx` (Recommended for Isolated CLI)
 ```bash
-# Install directly from GitHub:
-pipx install git+https://github.com/josephrotts/token-diet.git
-
-# Or install locally in editable mode:
-pipx install -e .
+pipx install token-diet-cli
 ```
 
 ### Via `pip` / `uv`
 ```bash
 # Using pip:
-pip install .
+pip install token-diet-cli
 
 # Using uv:
-uv tool install git+https://github.com/josephrotts/token-diet.git
+uv tool install token-diet-cli
 ```
 
 ### Running Directly from Source (No Installation Needed)
