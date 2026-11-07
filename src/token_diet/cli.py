@@ -12,6 +12,17 @@ import json
 import argparse
 from typing import List, Dict, Any, Optional, Tuple
 
+from .metrics import (
+    THRESHOLD_ALERT_BYTES,
+    THRESHOLD_WARN_BYTES,
+    classify_size,
+    estimate_tokens,
+)
+from .baseline import check_budget, compare_tokens, load_baseline
+from .git_hooks import AI_HOOK_KEYWORDS, has_ai_invocation, resolve_hooks_dir
+from .mcp_audit import audit_mcp_overhead
+from .sections import audit_sections_for_paths
+
 DEFAULT_PROMPT_PATHS = [
     os.path.expanduser("~/.codex/AGENTS.md"),
     os.path.expanduser("~/.codex/engram-instructions.md"),
@@ -33,8 +44,7 @@ LOCAL_PROMPT_CANDIDATES = [
 ]
 
 # Size thresholds in bytes
-THRESHOLD_WARN_BYTES = 4_000   # ~1,000 tokens
-THRESHOLD_ALERT_BYTES = 16_000 # ~4,000 tokens
+# THRESHOLD_WARN_BYTES and THRESHOLD_ALERT_BYTES are re-exported from .metrics
 
 
 def supports_color() -> bool:
@@ -65,22 +75,6 @@ def red(text: str) -> str:
 
 def bold(text: str) -> str:
     return colorize(text, "1")
-
-
-def estimate_tokens(char_count: int) -> int:
-    """Estimates tokens based on a conservative heuristic of ~4 characters per token."""
-    if char_count <= 0:
-        return 0
-    return char_count // 4
-
-
-def classify_size(size_bytes: int) -> Tuple[str, str]:
-    """Returns (status_label, severity) based on byte size."""
-    if size_bytes > THRESHOLD_ALERT_BYTES:
-        return "ALERT", "critical"
-    elif size_bytes > THRESHOLD_WARN_BYTES:
-        return "WARN", "warning"
-    return "OK", "optimal"
 
 
 def audit_file(filepath: str) -> Dict[str, Any]:
@@ -140,25 +134,27 @@ def detect_local_prompts(base_dir: str = ".") -> List[str]:
 
 
 def audit_git_hooks(repo_dir: str = ".") -> List[Dict[str, Any]]:
-    """Inspects .git/hooks for automated scripts that may silently trigger LLM calls."""
+    """
+    Inspects the active pre-commit hook for automated scripts that may silently
+    trigger LLM calls. Resolves `.git` gitdir files (linked worktrees, submodules)
+    and honors the repository `core.hooksPath` setting.
+    """
     alerts: List[Dict[str, Any]] = []
-    hook_path = os.path.join(os.path.abspath(repo_dir), ".git", "hooks", "pre-commit")
+    hooks_dir = resolve_hooks_dir(repo_dir)
+    if hooks_dir is None:
+        return alerts
 
-    if not os.path.exists(hook_path):
+    hook_path = os.path.join(hooks_dir, "pre-commit")
+    if not os.path.isfile(hook_path):
         return alerts
 
     try:
-        keywords = ["gga", "opencode", "gentle-ai", "claude", "gemini", "ollama", "llm review"]
         matched = []
         with open(hook_path, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
-                stripped = line.strip()
-                if stripped.startswith("#"):
-                    continue
-                lower_line = stripped.lower()
-                for k in keywords:
-                    if k in lower_line and k not in matched:
-                        matched.append(k)
+                for keyword in has_ai_invocation(line):
+                    if keyword not in matched:
+                        matched.append(keyword)
 
         if matched:
             alerts.append({
@@ -185,22 +181,31 @@ def audit_git_hooks(repo_dir: str = ".") -> List[Dict[str, Any]]:
 
 def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
     """
-    Safely neutralizes unmonitored AI/LLM invocations in .git/hooks/pre-commit:
-    1. Creates a backup copy at .git/hooks/pre-commit.bak.
+    Safely neutralizes unmonitored AI/LLM invocations in the active pre-commit hook:
+    1. Creates a backup copy at <hook>.bak.
     2. Comments out lines that invoke matched AI review keywords.
     3. Preserves original executable file permissions.
     """
-    hook_path = os.path.join(os.path.abspath(repo_dir), ".git", "hooks", "pre-commit")
-    if not os.path.exists(hook_path):
+    hooks_dir = resolve_hooks_dir(repo_dir)
+    if hooks_dir is None:
+        return {
+            "fixed": False,
+            "hook_path": None,
+            "backup_path": None,
+            "disabled_count": 0,
+            "message": "No Git hooks directory detected for this repository.",
+        }
+
+    hook_path = os.path.join(hooks_dir, "pre-commit")
+    if not os.path.isfile(hook_path):
         return {
             "fixed": False,
             "hook_path": hook_path,
             "backup_path": None,
             "disabled_count": 0,
-            "message": "No pre-commit hook found in .git/hooks/",
+            "message": "No pre-commit hook found in the active hooks directory.",
         }
 
-    keywords = ["gga", "opencode", "gentle-ai", "claude", "gemini", "ollama", "llm review"]
     try:
         with open(hook_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
@@ -214,8 +219,7 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 modified_lines.append(line)
                 continue
 
-            lower_line = line.lower()
-            if any(k in lower_line for k in keywords):
+            if has_ai_invocation(line):
                 modified_lines.append(f"# [token-diet disabled]: {line}")
                 disabled_count += 1
             else:
@@ -227,7 +231,7 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 "hook_path": hook_path,
                 "backup_path": None,
                 "disabled_count": 0,
-                "message": "No irregular AI hooks detected to disable in .git/hooks/pre-commit",
+                "message": f"No irregular AI hooks detected to disable in {hook_path}",
             }
 
         backup_path = hook_path + ".bak"
@@ -349,9 +353,33 @@ def main():
     parser.add_argument(
         "--fix-hooks",
         action="store_true",
-        help="Automatically neutralize unmonitored AI review invocations in .git/hooks/pre-commit (creates .bak backup).",
+        help="Automatically neutralize unmonitored AI review invocations in the active pre-commit hook (worktree and core.hooksPath aware; creates a .bak backup).",
+    )
+    parser.add_argument(
+        "--sections",
+        action="store_true",
+        help="Break down token and byte footprint per Markdown level-2 heading to locate prompt bloat.",
+    )
+    parser.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Audit MCP server payload overhead from local opencode.json, .mcp.json, or mcp.json configs.",
+    )
+    parser.add_argument(
+        "--baseline",
+        metavar="FILE",
+        help="Compare total estimated tokens against a previously saved JSON report (e.g. 'token-diet --json > baseline.json').",
+    )
+    parser.add_argument(
+        "--max-delta",
+        type=float,
+        metavar="PERCENT",
+        help="Exit with code 1 if total estimated tokens grow more than PERCENT over --baseline.",
     )
     args = parser.parse_args()
+
+    if args.max_delta is not None and args.baseline is None:
+        parser.error("--max-delta requires --baseline <file.json>")
 
     if args.fix_hooks:
         fix_result = fix_git_hooks(".")
@@ -373,8 +401,25 @@ def main():
     # Detect git hooks in current working directory
     hook_alerts = audit_git_hooks(".") if check_local and not targets else []
 
-    results = audit_known_prompts(targets, check_local=check_local)
+    target_paths = resolve_target_paths(targets, check_local=check_local)
+    results = [audit_file(p) for p in target_paths]
     summary = summarize_footprint(results, hook_alerts)
+
+    baseline_comparison: Optional[Dict[str, Any]] = None
+    if args.baseline is not None:
+        baseline = load_baseline(args.baseline)
+        if not baseline["ok"]:
+            parser.error(baseline["error"])
+        if args.max_delta is not None:
+            baseline_comparison = check_budget(
+                summary["total_tokens"], baseline["tokens"], args.max_delta
+            )
+        else:
+            baseline_comparison = compare_tokens(summary["total_tokens"], baseline["tokens"])
+
+    section_report = sections_payload(target_paths) if args.sections else None
+    mcp_report = audit_mcp_overhead(".") if args.mcp else None
+    baseline_exceeded = bool(baseline_comparison and baseline_comparison.get("exceeded"))
 
     if args.json:
         payload = {
@@ -382,8 +427,14 @@ def main():
             "hook_alerts": hook_alerts,
             "details": results,
         }
+        if section_report is not None:
+            payload["sections"] = section_report
+        if mcp_report is not None:
+            payload["mcp"] = mcp_report
+        if baseline_comparison is not None:
+            payload["baseline_comparison"] = baseline_comparison
         print(json.dumps(payload, indent=2))
-        _check_exit_conditions(summary, args.max_tokens, args.strict)
+        _check_exit_conditions(summary, args.max_tokens, args.strict, baseline_exceeded)
         return
 
     # Terminal Output
@@ -434,14 +485,144 @@ def main():
         print("\n" + yellow("ℹ️  MODERATE CONTEXT SIZE:"))
         print("  Files marked [WARN] exceed 4 KB. Review if non-essential sections can be pruned.")
 
-    _check_exit_conditions(summary, args.max_tokens, args.strict)
+    if section_report is not None:
+        print()
+        render_sections_report(section_report)
+
+    if mcp_report is not None:
+        print()
+        render_mcp_report(mcp_report)
+
+    if baseline_comparison is not None:
+        print()
+        render_baseline_report(baseline_comparison, args.max_delta)
+
+    _check_exit_conditions(summary, args.max_tokens, args.strict, baseline_exceeded)
 
 
-def _check_exit_conditions(summary: Dict[str, Any], max_tokens: Optional[int], strict: bool):
+def status_badge(status: str) -> str:
+    """Returns a colored [OK] / [WARN] / [ALERT] badge for a status label."""
+    if status == "ALERT":
+        return red("[ALERT]")
+    if status == "WARN":
+        return yellow("[WARN]")
+    return green("[OK]")
+
+
+def sections_payload(paths: List[str]) -> Dict[str, Any]:
+    """Builds the `--sections` report payload, dropping internal section source text."""
+    report = audit_sections_for_paths(paths)
+    files: List[Dict[str, Any]] = []
+    for entry in report["files"]:
+        compact = {k: v for k, v in entry.items() if k != "sections"}
+        compact["sections"] = [
+            {k: v for k, v in section.items() if k != "text"}
+            for section in entry.get("sections", [])
+        ]
+        files.append(compact)
+    return {
+        "files": files,
+        "file_count": report["file_count"],
+        "total_bytes": report["total_bytes"],
+        "total_tokens": report["total_tokens"],
+    }
+
+
+def render_sections_report(report: Dict[str, Any]) -> None:
+    """Prints the per-heading footprint breakdown."""
+    print(bold("=" * 80))
+    print(bold("SECTION BREAKDOWN: MARKDOWN HEADING FOOTPRINT"))
+    print(bold("=" * 80))
+    if report["file_count"] == 0:
+        print(yellow("  No files matched for section analysis."))
+        return
+
+    for entry in report["files"]:
+        if not entry["exists"]:
+            print(colorize(f"{entry['path']}: (missing)", "90"))
+            continue
+        print(bold(f"{entry['path']}  ({entry['bytes']:,d} B / ~{entry['estimated_tokens']:,d} tokens)"))
+        print(f'{"Line":>6} | {"Heading":<40} | {"Bytes":>9} | {"Tokens":>9} | {"Status":>8}')
+        print("-" * 80)
+        for section in entry["sections"]:
+            heading = section["heading"]
+            if len(heading) > 38:
+                heading = heading[:35] + "..."
+            badge = status_badge(section["status"])
+            print(
+                f'{section["line"]:>6} | {heading:<40} | '
+                f'{section["bytes"]:>9,d} | {section["estimated_tokens"]:>9,d} | {badge:>17}'
+            )
+        print("-" * 80)
+
+    print(f"Total Sections:  {sum(len(e['sections']) for e in report['files'])}")
+    print(f"Total Bytes:     {report['total_bytes']:,d} B")
+    print(f"Total Tokens:    ~{report['total_tokens']:,d} estimated")
+
+
+def render_mcp_report(report: Dict[str, Any]) -> None:
+    """Prints the MCP server payload overhead breakdown."""
+    print(bold("=" * 80))
+    print(bold("MCP SERVER PAYLOAD AUDIT"))
+    print(bold("=" * 80))
+    if report["config_count"] == 0:
+        print(yellow("  No MCP configuration found (opencode.json, .mcp.json, mcp.json)."))
+        return
+
+    for config in report["configs"]:
+        if config.get("error"):
+            print(red(f"{config['path']}: unreadable ({config['error']})"))
+            continue
+        print(bold(f"{config['path']}  [{config['format']}]  ({config['total_servers']} server(s))"))
+        if not config["servers"]:
+            print(colorize("  No MCP servers declared.", "90"))
+            continue
+        print(f'{"Server":<30} | {"Transport":<9} | {"Tools":>5} | {"Bytes":>9} | {"Tokens":>9} | {"Status":>8}')
+        print("-" * 80)
+        for server in config["servers"]:
+            name = server["name"]
+            if len(name) > 28:
+                name = name[:25] + "..."
+            badge = status_badge(server["status"])
+            print(
+                f'{name:<30} | {server["transport"]:<9} | {server["tool_count"]:>5,d} | '
+                f'{server["bytes"]:>9,d} | {server["estimated_tokens"]:>9,d} | {badge:>17}'
+            )
+        print("-" * 80)
+
+    print(f"MCP Servers:     {report['total_servers']}")
+    print(f"Total Bytes:     {report['total_bytes']:,d} B")
+    print(f"Total Tokens:    ~{report['total_tokens']:,d} estimated")
+
+
+def render_baseline_report(comparison: Dict[str, Any], max_delta: Optional[float]) -> None:
+    """Prints the baseline delta and, when a budget is set, its verdict."""
+    delta = comparison["delta_tokens"]
+    sign = "+" if delta > 0 else ""
+    print(bold("BASELINE COMPARISON:"))
+    print(f"  Baseline: ~{comparison['baseline_tokens']:,d} tokens")
+    print(f"  Current:  ~{comparison['current_tokens']:,d} tokens")
+    print(f"  Delta:    {sign}{delta:,d} tokens ({sign}{comparison['delta_percent']}%)")
+    if max_delta is None:
+        return
+    if comparison["exceeded"]:
+        print(red(f"  BUDGET EXCEEDED: growth above the allowed {max_delta}% delta."))
+    else:
+        print(green(f"  Within budget: growth is at most {max_delta}%."))
+
+
+def _check_exit_conditions(
+    summary: Dict[str, Any],
+    max_tokens: Optional[int],
+    strict: bool,
+    baseline_exceeded: bool = False,
+):
     """Handles exit codes for CI/CD gates."""
     if max_tokens is not None and summary["total_tokens"] > max_tokens:
         sys.exit(1)
     if strict and (summary["alerts"] > 0 or summary["warnings"] > 0):
+        sys.exit(1)
+    if baseline_exceeded:
         sys.exit(1)
 
 

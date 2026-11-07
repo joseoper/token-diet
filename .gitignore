@@ -37,3 +37,6 @@ Thumbs.db
 .gga
 .hermes/
 .orca/
+
+# ODD orchestration artifacts (local only)
+odd/

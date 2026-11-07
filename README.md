@@ -14,8 +14,10 @@ Worse, some local tools install hidden `pre-commit` hooks that send your entire 
 
 `token-diet` scans your repository or workstation in milliseconds to:
 - **Audit prompt size:** Flags instruction files that exceed context budgets (`[OK]`, `[WARN]`, `[ALERT]`).
-- **Catch rogue git hooks:** Detects and disables silent LLM review hooks in `.git/hooks/pre-commit` (`--fix-hooks`).
-- **Guard CI pipelines:** Fails PR builds if prompt expansions exceed token thresholds (`--strict`, `--max-tokens`).
+- **Catch rogue git hooks:** Detects and disables silent LLM review hooks in the active hooks directory (`--fix-hooks`), including linked worktrees, submodules, and repositories using `core.hooksPath`.
+- **Locate the bloat:** Breaks a Markdown directive down per level-2 heading so you know which section to trim (`--sections`).
+- **Audit MCP overhead:** Reports the context cost of every declared MCP server in `opencode.json`, `.mcp.json`, and `mcp.json` (`--mcp`).
+- **Guard CI pipelines:** Fails PR builds if prompt expansions exceed token thresholds or regress past a saved baseline (`--strict`, `--max-tokens`, `--baseline`, `--max-delta`).
 - **Zero dependencies:** Pure Python standard library (Python >= 3.8). Runs in < 10ms.
 
 ---
@@ -156,6 +158,60 @@ Emit structured JSON for automated pipelines, threshold assertions, or telemetry
 token-diet --json
 ```
 
+### 8. Locate Prompt Bloat per Heading (`--sections`)
+A monolithic directive rarely bloats evenly. This breakdown attributes bytes and estimated tokens to every level-2 (`##`) heading, so you know exactly which section to compress or move into an on-demand skill:
+
+```bash
+token-diet --sections AGENTS.md
+```
+
+```
+SECTION BREAKDOWN: MARKDOWN HEADING FOOTPRINT
+================================================================================
+AGENTS.md  (23,914 B / ~5,978 tokens)
+  Line | Heading                                  |     Bytes |    Tokens |   Status
+--------------------------------------------------------------------------------
+     1 | (preamble)                               |       412 |       103 |              [OK]
+    12 | Core Directives                          |    19,220 |     4,805 |           [ALERT]
+    98 | Additional Protocols                      |     4,282 |     1,070 |            [WARN]
+--------------------------------------------------------------------------------
+```
+
+Content before the first `##` heading is grouped as `(preamble)`, and deeper headings (`###`) stay attributed to their parent section. Combine with `--json` for machine-readable output.
+
+### 9. Audit MCP Server Overhead (`--mcp`)
+Every declared MCP server consumes context, and some configs inline large tool schemas. `token-diet` discovers local `opencode.json`, `.mcp.json`, `mcp.json`, `.cursor/mcp.json`, and `.vscode/mcp.json` files and reports the payload cost per server:
+
+```bash
+token-diet --mcp
+```
+
+```
+MCP SERVER PAYLOAD AUDIT
+================================================================================
+opencode.json  [opencode]  (2 server(s))
+Server                         | Transport | Tools |     Bytes |    Tokens |   Status
+--------------------------------------------------------------------------------
+engram                         | local     |    12 |    18,430 |     4,607 |           [ALERT]
+web-search                     | remote    |     0 |       142 |        35 |              [OK]
+--------------------------------------------------------------------------------
+```
+
+Config-declared `tools` blocks are counted and included in each server's payload. Schemas fetched by a server at runtime are not visible to a local audit; the reported figure is the local injection cost floor.
+
+### 10. Fail on Regression vs a Saved Baseline (`--baseline`, `--max-delta`)
+Record a baseline once, then gate every pull request against it. This catches slow, incremental growth that a fixed threshold never notices:
+
+```bash
+# Save the baseline on your default branch
+token-diet --json > token-baseline.json
+
+# Fail if the total grows more than 5% in a pull request
+token-diet --baseline token-baseline.json --max-delta 5
+```
+
+`--baseline` accepts any `--json` report (`{"summary": {"total_tokens": N}}`) or a minimal `{"total_tokens": N}` file. `--max-delta` exits with code `1` only when tokens **increase** beyond the given percentage; a decrease, an unchanged total, or growth exactly at the budget passes.
+
 ---
 
 ## Health Status Indicators
@@ -165,7 +221,7 @@ token-diet --json
 | 🟢 `[OK]` | `< 4 KB` | `< 1,000 tokens` | **Optimal Context:** Fits cleanly within prompt cache. Preserves fast, cheap inference. |
 | 🟡 `[WARN]` | `4 KB – 16 KB` | `1,000 – 4,000 tokens` | **Moderate Size:** Acceptable, but review for duplicate instructions or unneeded verbosity. |
 | 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **Severe Prompt Bloat:** Monolithic rules degrade reasoning and waste context budget every turn. Decouple into On-Demand Skills. |
-| 🚨 `[HOOK ALERT]` | — | — | **Hidden Token Bleed:** Local `.git/hooks/pre-commit` sends code to cloud LLMs on every `git commit`. Replace with static linters. |
+| 🚨 `[HOOK ALERT]` | — | — | **Hidden Token Bleed:** The active `pre-commit` hook sends code to cloud LLMs on every `git commit`. Replace with static linters. |
 
 ---
 
@@ -233,9 +289,18 @@ token-diet/
 │   └── token_diet/            # Core Python package (Zero external dependencies)
 │       ├── __init__.py
 │       ├── __main__.py
-│       └── cli.py             # CLI implementation and footprint engine
+│       ├── baseline.py        # Baseline comparison & regression budget gate
+│       ├── cli.py             # CLI implementation and footprint engine
+│       ├── git_hooks.py       # Worktree, gitdir and core.hooksPath resolution
+│       ├── mcp_audit.py       # MCP config discovery & payload accounting
+│       ├── metrics.py         # Shared byte thresholds and token estimation
+│       └── sections.py        # Per-heading Markdown footprint breakdown
 ├── tests/
-│   └── test_token_audit.py    # Automated unit test suite (TDD)
+│   ├── test_baseline.py       # Baseline budget unit tests
+│   ├── test_git_hooks.py      # Hook resolution unit tests
+│   ├── test_mcp_audit.py      # MCP payload unit tests
+│   ├── test_sections.py       # Section breakdown unit tests
+│   └── test_token_audit.py    # Core engine and CLI integration tests
 ├── .gitignore
 ├── AGENTS.md                  # Agent-friendly repository directives
 ├── CONTRIBUTING.md            # Contribution guidelines & engineering principles

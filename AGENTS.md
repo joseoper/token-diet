@@ -6,7 +6,7 @@ Welcome, agent. This repository is built around **Token Diet** principles to eli
 
 1. **Architecture Context:** Before modifying diagnostic logic, refer to [`docs/remediation-playbook.md`](docs/remediation-playbook.md) for containment procedures and [`docs/ci-integration.md`](docs/ci-integration.md) for automated gatekeeper integration.
 2. **Zero External Dependencies:** `src/token_diet/` must remain pure Python standard library (`sys`, `os`, `json`, `argparse`, `typing`). Do not introduce third-party runtime dependencies.
-3. **Test-Driven Development (TDD):** Every heuristic, threshold badge (`[OK]`, `[WARN]`, `[ALERT]`), or CLI argument change must have tests in `tests/test_token_audit.py`. Verify with:
+3. **Test-Driven Development (TDD):** Every heuristic, threshold badge (`[OK]`, `[WARN]`, `[ALERT]`), or CLI argument change must have tests under `tests/` (discovered by `test_*.py`). Feature modules keep unit tests in a matching `tests/test_<module>.py`; CLI flags and cross-module wiring are covered in `tests/test_token_audit.py`. Verify with:
    ```bash
    python3 -m unittest discover -s tests -p 'test_*.py'
    ```
