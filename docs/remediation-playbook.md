@@ -26,7 +26,14 @@ flowchart TD
         P3C["Enforce prompt cache prefix immutability"]
     end
 
-    PHASE1 --> PHASE2 --> PHASE3
+    subgraph PHASE4 ["Phase 4: In-Session Runtime Hygiene (Active Guards)"]
+        P4A["Grep-first & line-range reads over full dumps"]
+        P4B["Targeted block diffs over full overwrites"]
+        P4C["Session compaction & 80k-100k token cutoffs"]
+        P4D["Subagent isolation & model routing for bulk jobs"]
+    end
+
+    PHASE1 --> PHASE2 --> PHASE3 --> PHASE4
 ```
 
 ---
@@ -112,6 +119,64 @@ Instead of placing full operational manuals inline, transform root directive fil
 ### 3.3 Preserve Prompt Cache Prefix Immutability
 * Providers (Anthropic, OpenAI, Google) offer discounts (up to 90%) when prompt prefixes are byte-for-byte identical across turns.
 * **Action:** Never prepend dynamic timestamps, randomized UUIDs, or unstable session states to the top of prompt directive files. Keep the initial token sequence completely deterministic.
+
+---
+
+## Phase 4: In-Session Runtime Hygiene (Active Execution Guards)
+
+While Phases 1–3 secure static repository directives and developer infrastructure, Phase 4 governs the **live conversation loop**. Unmonitored agents frequently burn hundreds of thousands of tokens within a single debugging session through careless file dumping, full-file rewrites, and monolithic conversation threads.
+
+### 4.1 Grep-First & Line-Range Inspections (No Blind Dumps)
+* **Problem:** An agent inspecting a single error loads an entire 1,500-line file (~4,000–6,000 tokens). That file payload remains in the conversation history and is re-billed on **every subsequent turn**. Five turns later, that single full-file read has cost 25,000 input tokens.
+* **Bad Pattern:** Calling `view_file` or `cat` without line limits on large source files.
+* **Remediation Pattern:**
+  1. Use deterministic symbol searches (`grep -n`, `ripgrep`, or code search tools) to pinpoint the exact line location.
+  2. Inspect only the relevant context window using targeted line ranges (e.g., 30–80 lines centered around the target function or line).
+
+| Reading Method | Typical Turn Cost | Cost Across 5 Turns |
+|---|:---:|:---:|
+| Full file dump (1,500 lines) | ~5,000 tokens | **25,000 tokens** |
+| Targeted range (50 lines) | ~180 tokens | **900 tokens** (96% savings) |
+
+### 4.2 Targeted Block Diffs over Whole-File Rewrites
+* **Problem:** Rewriting an entire 800-line file just to adjust 5 lines burns thousands of high-cost **output tokens** (billed at 3x–5x input pricing) and invalidates intermediate prompt cache prefixes.
+* **Remediation Pattern:**
+  - Always enforce patch- or replacement-based edit tools (such as `replace_file_content` or `git apply`).
+  - Restrict diffs to the minimal contiguous block containing the modification.
+  - Never regenerate an entire module when modifying individual functions or variables.
+
+### 4.3 Context Compaction & 80k–100k Token Hard Cutoffs
+* **Problem:** Long-running debugging sessions accumulate dead terminal output, stale file diffs, and obsolete stack traces. Once a thread exceeds ~80,000 tokens, response latency increases, reasoning fidelity degrades ("needle in a haystack" decay), and every prompt costs a fortune.
+* **Remediation Pattern:**
+  - Establish a hard ceiling: **Compact context or start a new thread at ~80,000–100,000 tokens**.
+  - **Thread Handover Protocol:** When hitting the threshold:
+    1. Have the agent produce a concise bulleted handover state (Goal, Current Progress, Remaining Blockers, Changed Files).
+    2. Reset or branch the conversation thread, feeding only the handover summary as the starting state.
+
+### 4.4 Subagent Isolation & Model Routing for Bulk Operations
+* **Problem:** Running broad codebase sweeps, test suite log parsing, or multi-repo queries directly in your primary reasoning model floods the primary context with ephemeral data.
+* **Remediation Pattern:**
+  - **Isolate High-Volume Work:** Spawn lightweight, read-only subagents (or delegate tasks) with fast, economical models (e.g., `flash`, `haiku`) for bulk information retrieval.
+  - The subagent digests the raw 50,000 tokens of logs or search hits and returns only a crisp, 200-token synthesized summary to the primary agent.
+  - Match model tier to the task: Use frontier reasoning models (`pro`, `opus`) strictly for architectural decisions; route diagnostics, linting, and boilerplate generation to smaller tiers.
+
+### 4.5 Terse Output Templates & Zero Fluff
+* **Problem:** Conversational filler ("Sure thing! Let me help you with that...", "As you can see from the above code..."), repeating unmodified files, and verbose apologies burn premium output tokens.
+* **Remediation Pattern:**
+  - Configure agents to output concise, technical summaries: action taken, diff reference, test verification command.
+  - Omit pleasantries, conversational transitions, and unrequested re-explanations of code.
+
+### 4.6 Copy-Paste In-Session Guard Directives for AI Agents
+To enforce these runtime guards automatically, add this block to your root agent directive file (`AGENTS.md` or `CLAUDE.md`):
+
+```markdown
+## In-Session Runtime Token Hygiene
+- **Line-Range Reads:** Never read entire files >100 lines without specific user request. Use grep/symbols first, then read bounded line ranges (`start_line`, `end_line`).
+- **Targeted Edits:** Always use patch/block replacements for existing files. Never overwrite whole files to apply localized changes.
+- **Subagent Offloading:** Offload large grep sweeps or log processing to lightweight subagents; return only synthesized conclusions to this thread.
+- **Output Conciseness:** Omit conversational filler and pleasantries. State action, diff summary, and verification command directly.
+- **Context Ceiling:** If the session context approaches 80k tokens, prompt for a session compaction handover.
+```
 
 ---
 

@@ -311,7 +311,7 @@ token-diet/
 
 ---
 
-## Core Methodology: The 5 Vectors of Token Leakage
+## Core Methodology: The 6 Vectors of Token Leakage
 
 Token Diet is built on empirical analysis of how developer environments silently deplete API quotas:
 
@@ -320,6 +320,7 @@ Token Diet is built on empirical analysis of how developer environments silently
 3. **Reasoning Effort Inflation:** Running frontier models at `high` reasoning effort for simple syntax or diagnostic queries generates thousands of hidden chain-of-thought tokens. *Solution: Default to `medium` or `low`.*
 4. **Static MCP Schemas:** Registering dozens of MCP tools serializes massive JSON parameter schemas into system prompts. *Solution: Prune unused tool servers and enforce lazy-loading.*
 5. **Prompt Cache Invalidation:** Injecting dynamic timestamps or changing session IDs at the start of instructions destroys provider prompt caching discounts (up to 90%). *Solution: Maintain immutable instruction prefixes.*
+6. **In-Session Runtime Inefficiencies:** Agents loading entire 1,500-line files to check one function, overwriting whole files instead of focused diffs, or running uncompacted 100k+ token threads. *Solution: Enforce active runtime hygiene (grep-first, line-range reads, targeted diffs, and context compaction thresholds; see [Remediation Playbook Phase 4](docs/remediation-playbook.md#phase-4-in-session-runtime-hygiene-active-execution-guards)).*
 
 ---
 

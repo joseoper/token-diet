@@ -10,3 +10,4 @@ Welcome, agent. This repository is built around **Token Diet** principles to eli
    ```bash
    python3 -m unittest discover -s tests -p 'test_*.py'
    ```
+4. **In-Session Runtime Token Hygiene:** Adhere to [Phase 4 guidelines](docs/remediation-playbook.md#phase-4-in-session-runtime-hygiene-active-execution-guards): prefer line-range reads (`start_line`, `end_line`) and symbol searches over full-file dumping, enforce targeted block replacements over whole-file rewrites, and keep responses concise and free of conversational pleasantries.
