@@ -117,3 +117,36 @@ Generate structured telemetry reports inside PR reviews using the `--json` flag:
 | **Root Directives (`AGENTS.md`)** | `1,000 tokens` (< 4 KB) | Leaves 99%+ of the context window free for source code and tools. |
 | **Project Documentation Folder (`docs/`)** | `5,000 tokens` (< 20 KB) | Prevents documentation trees from exceeding default retrieval limits. |
 | **Total Turn Ingestion Budget** | `2,500 tokens` (< 10 KB) | Preserves maximum prompt cache hit rate and minimizes per-turn toll. |
+
+---
+
+## 5. Baseline Regression Budget (PR Delta Gate)
+
+Fixed thresholds miss slow, incremental growth: a directive can double in size over twenty pull requests and never trip `--max-tokens`. A baseline delta gate fails only the growth introduced by the pull request under review.
+
+Commit the baseline on your default branch, then gate every pull request against it:
+
+```yaml
+      - name: Checkout Base Branch Baseline
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Run Baseline Gate
+        run: |
+          pip install token-diet-cli
+          ( cd base && token-diet --json > ../token-baseline.json )
+          token-diet --baseline token-baseline.json --max-delta 5
+```
+
+`--max-delta 5` allows up to 5% total growth and exits `1` beyond that. A decrease, an unchanged total, or growth exactly at the budget passes, so the gate never fails on noise.
+
+Keep the baseline inside the repository when the base branch is not available at build time:
+
+```bash
+token-diet --json > token-baseline.json       # refresh intentionally, on the default branch
+token-diet --baseline token-baseline.json --max-delta 5
+```
+
+`--baseline` accepts a full `--json` report or a minimal `{"total_tokens": N}` snapshot, so a small committed file is enough.
