@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [
-    { name = "josephrotts", email = "387283+josephrotts@users.noreply.github.com" }
+    { name = "joseoper", email = "joseoper@users.noreply.github.com" }
 ]
 keywords = ["tokens", "llm", "claude", "gemini", "codex", "opencode", "developer-tools"]
 classifiers = [

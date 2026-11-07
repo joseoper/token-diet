@@ -26,9 +26,9 @@ Worse, some local tools install hidden `pre-commit` hooks that send your entire 
 
 ### Via Homebrew (macOS & Linux)
 ```bash
-brew install josephrotts/tap/token-diet
+brew install joseoper/tap/token-diet
 # Or:
-brew tap josephrotts/tap
+brew tap joseoper/tap
 brew install token-diet
 ```
 
@@ -48,7 +48,7 @@ uv tool install token-diet-cli
 
 ### Running Directly from Source (No Installation Needed)
 ```bash
-git clone https://github.com/josephrotts/token-diet.git
+git clone https://github.com/joseoper/token-diet.git
 cd token-diet
 PYTHONPATH=src python3 -m token_diet
 ```
