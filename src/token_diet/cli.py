@@ -148,16 +148,17 @@ def detect_local_prompts(base_dir: str = ".") -> List[str]:
     abs_base = os.path.abspath(base_dir)
 
     for candidate in LOCAL_PROMPT_CANDIDATES:
-        p = os.path.join(abs_base, candidate)
+        p = os.path.normpath(os.path.join(abs_base, candidate))
         if os.path.isfile(p):
             found.append(p)
 
     # Check .cursor/rules directory if it exists
     cursor_rules_dir = os.path.join(abs_base, ".cursor", "rules")
     if os.path.isdir(cursor_rules_dir):
-        for root, _, files in os.walk(cursor_rules_dir):
+        for root, dirs, files in os.walk(cursor_rules_dir):
+            dirs.sort()
             for f in sorted(files):
-                if f.endswith((".md", ".mdc", ".txt")):
+                if not f.startswith(".") and f.endswith((".mdc", ".md")):
                     found.append(os.path.join(root, f))
 
     return found

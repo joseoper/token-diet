@@ -74,6 +74,48 @@ class TestTokenAudit(unittest.TestCase):
             self.assertIn(agent_file, detected)
             self.assertIn(cursor_file, detected)
 
+    def test_detect_local_prompts_cursor_rules_and_copilot_instructions(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # 1. .cursor/rules/*.mdc and *.md
+            cursor_rules_dir = os.path.join(tmp_dir, ".cursor", "rules")
+            os.makedirs(cursor_rules_dir)
+            rule_mdc = os.path.join(cursor_rules_dir, "my-rule.mdc")
+            with open(rule_mdc, "w") as f:
+                f.write("# MDC Rule")
+            rule_md = os.path.join(cursor_rules_dir, "other-rule.md")
+            with open(rule_md, "w") as f:
+                f.write("# MD Rule")
+            # Ignored files in .cursor/rules
+            with open(os.path.join(cursor_rules_dir, "notes.txt"), "w") as f:
+                f.write("text note")
+            with open(os.path.join(cursor_rules_dir, ".hidden.md"), "w") as f:
+                f.write("hidden")
+
+            # 2. .github/copilot-instructions.md
+            github_dir = os.path.join(tmp_dir, ".github")
+            os.makedirs(github_dir)
+            copilot_file = os.path.join(github_dir, "copilot-instructions.md")
+            with open(copilot_file, "w") as f:
+                f.write("# Copilot instructions")
+
+            # 3. .clinerules and .windsurfrules
+            cline_file = os.path.join(tmp_dir, ".clinerules")
+            with open(cline_file, "w") as f:
+                f.write("# Cline rules")
+            windsurf_file = os.path.join(tmp_dir, ".windsurfrules")
+            with open(windsurf_file, "w") as f:
+                f.write("# Windsurf rules")
+
+            detected = detect_local_prompts(tmp_dir)
+
+            self.assertIn(rule_mdc, detected)
+            self.assertIn(rule_md, detected)
+            self.assertIn(copilot_file, detected)
+            self.assertIn(cline_file, detected)
+            self.assertIn(windsurf_file, detected)
+            self.assertNotIn(os.path.join(cursor_rules_dir, "notes.txt"), detected)
+            self.assertNotIn(os.path.join(cursor_rules_dir, ".hidden.md"), detected)
+
     def test_audit_git_hooks_safe_and_alert(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             hooks_dir = os.path.join(tmp_dir, ".git", "hooks")
@@ -375,6 +417,43 @@ class TestCliFlags(unittest.TestCase):
             code, _, err = self._run(["--max-tokens", "2500"], cwd=empty_dir)
             self.assertEqual(code, 1)
             self.assertIn("Token budget gate active", err)
+
+    def test_cli_audits_modular_rules_individually(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            cursor_dir = os.path.join(tmp_dir, ".cursor", "rules")
+            os.makedirs(cursor_dir)
+            rule_mdc = os.path.join(cursor_dir, "my-rule.mdc")
+            with open(rule_mdc, "w", encoding="utf-8") as f:
+                f.write("rule mdc content here")
+
+            github_dir = os.path.join(tmp_dir, ".github")
+            os.makedirs(github_dir)
+            copilot_file = os.path.join(github_dir, "copilot-instructions.md")
+            with open(copilot_file, "w", encoding="utf-8") as f:
+                f.write("copilot instructions content here")
+
+            # JSON audit check
+            code, out, _ = self._run(["--json"], cwd=tmp_dir)
+            self.assertEqual(code, 0)
+            payload = json.loads(out)
+            self.assertEqual(payload["summary"]["files_found"], 2)
+
+            details_paths = [d["path"] for d in payload["details"]]
+            self.assertIn(rule_mdc, details_paths)
+            self.assertIn(copilot_file, details_paths)
+
+            for d in payload["details"]:
+                self.assertTrue(d["exists"])
+                self.assertGreater(d["bytes"], 0)
+                self.assertGreater(d["estimated_tokens"], 0)
+                self.assertEqual(d["status"], "OK")
+
+            # Terminal audit check
+            code, out, _ = self._run([], cwd=tmp_dir)
+            self.assertEqual(code, 0)
+            self.assertIn("my-rule.mdc", out)
+            self.assertIn("copilot-instructions.md", out)
+            self.assertIn("Files Detected:  2 of 2", out)
 
 
 if __name__ == "__main__":
