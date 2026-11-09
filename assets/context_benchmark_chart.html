@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px;
+    height: 900px;
+    background-color: #171922;
+    background-image: 
+      radial-gradient(circle at 15% 15%, rgba(244, 63, 94, 0.05) 0%, transparent 45%),
+      radial-gradient(circle at 85% 15%, rgba(0, 163, 255, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.05) 0%, transparent 45%);
+    color: #F8FAFC;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 44px 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #00A3FF;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    color: #FFFFFF;
+  }
+  .header-badge {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #94A3B8;
+  }
+
+  /* Main Comparison Stage */
+  .stage {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    height: 540px;
+  }
+
+  /* Cards */
+  .device-card {
+    flex: 1;
+    height: 100%;
+    background: #1E222D;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+  }
+
+  .device-card.danger {
+    border-color: rgba(244, 63, 94, 0.25);
+    background: linear-gradient(180deg, #201D27 0%, #1A1C25 100%);
+  }
+
+  .device-card.success {
+    border-color: #0090FF;
+    background: linear-gradient(180deg, #1C2436 0%, #171E2D 100%);
+    box-shadow: 0 0 35px rgba(0, 144, 255, 0.12);
+  }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 12px;
+  }
+
+  .card-top-info h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 2px;
+  }
+
+  .card-top-info p {
+    font-size: 12px;
+    color: #94A3B8;
+  }
+
+  .pill {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  .pill.pill-danger {
+    background: rgba(244, 63, 94, 0.15);
+    color: #FB7185;
+    border: 1px solid rgba(244, 63, 94, 0.3);
+  }
+
+  .pill.pill-success {
+    background: rgba(0, 163, 255, 0.15);
+    color: #38BDF8;
+    border: 1px solid rgba(0, 163, 255, 0.3);
+  }
+
+  /* Context Bar Container */
+  .bar-container {
+    flex: 1;
+    background: #141720;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bar-segment {
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Monolithic Segments */
+  .seg-bloat {
+    height: 72%;
+    background: linear-gradient(135deg, rgba(244, 63, 94, 0.18) 0%, rgba(244, 63, 94, 0.08) 100%);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+  }
+
+  .seg-bloat-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .bloat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11.5px;
+    color: #FECDD3;
+    width: fit-content;
+  }
+
+  .seg-tight-memory {
+    height: 28%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    justify-content: center;
+  }
+
+  /* LUT Router Segments */
+  .seg-lut {
+    height: 14%;
+    background: rgba(0, 163, 255, 0.12);
+    border: 1px solid rgba(0, 163, 255, 0.35);
+  }
+
+  .seg-expanded-memory {
+    height: 86%;
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.14) 0%, rgba(0, 163, 255, 0.08) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    justify-content: flex-start;
+    padding-top: 20px;
+  }
+
+  .seg-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .seg-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 0.2px;
+  }
+
+  .seg-pct {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .color-danger { color: #FB7185; }
+  .color-success { color: #34D399; }
+  .color-blue { color: #38BDF8; }
+  .color-muted { color: #94A3B8; }
+
+  .seg-desc {
+    font-size: 12px;
+    color: #94A3B8;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  .memory-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .memory-chip {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #A7F3D0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Metric Footers */
+  .card-metric-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 12px;
+  }
+
+  .m-box {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .m-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #64748B;
+    text-transform: uppercase;
+  }
+
+  .m-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+
+  /* Center Connector Flow */
+  .center-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 140px;
+  }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #0084FF;
+    color: #FFFFFF;
+    box-shadow: 0 0 20px rgba(0, 132, 255, 0.4);
+  }
+
+  .flow-pill {
+    background: #1B2130;
+    border: 1px solid #0090FF;
+    border-radius: 12px;
+    padding: 12px 14px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .flow-pill .big-stat {
+    font-size: 22px;
+    font-weight: 800;
+    color: #38BDF8;
+    line-height: 1;
+  }
+
+  .flow-pill .stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #94A3B8;
+    letter-spacing: 0.5px;
+  }
+
+  /* Footer Steps (Reference Image Exact Match) */
+  .footer-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    background: #1B1E28;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 18px 24px;
+  }
+
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #0084FF;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #FFFFFF;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: #94A3B8;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="title-group">
+      <div class="subtitle">Context Window Benchmark</div>
+      <h1 class="title">AI Coding Agent Context Allocation</h1>
+    </div>
+    <div class="header-badge">
+      Standard 200k Token Window / 20-Turn Session
+    </div>
+  </div>
+
+  <!-- Stage -->
+  <div class="stage">
+
+    <!-- Card Left: Monolithic Bloat -->
+    <div class="device-card danger">
+      <div class="card-top">
+        <div class="card-top-info">
+          <h2>Monolithic Directives (No Diet)</h2>
+          <p>Overloaded root rules, unmetered hooks & MCP schemas</p>
+        </div>
+        <div class="pill pill-danger">Context Bleed</div>
+      </div>
+
+      <div class="bar-container">
+        <!-- Bloat segment -->
+        <div class="bar-segment seg-bloat">
+          <div class="seg-title-row">
+            <span class="seg-title">Boilerplate & Idle Rules</span>
+            <span class="seg-pct color-danger">~75% Wasted</span>
+          </div>
+          <div class="seg-desc">Unused instructions re-ingested on every single turn</div>
+          <div class="seg-bloat-items">
+            <div class="bloat-chip">⚠️ 25 KB Monolithic AGENTS.md (~8.4k tokens)</div>
+            <div class="bloat-chip">⚠️ Unmetered MCP Tool Schema Definitions</div>
+            <div class="bloat-chip">⚠️ Silent AI Pre-commit Hook Diffs</div>
+          </div>
+        </div>
+
+        <!-- Remaining memory -->
+        <div class="bar-segment seg-tight-memory">
+          <div class="seg-title-row">
+            <span class="seg-title">Retained Working Memory</span>
+            <span class="seg-pct color-muted">~25% Usable</span>
+          </div>
+          <div class="seg-desc">Constrained space for multi-file AST, test diffs & reasoning</div>
+        </div>
+      </div>
+
+      <div class="card-metric-footer">
+        <div class="m-box">
+          <div class="m-label">Base Overhead</div>
+          <div class="m-val color-danger">~8,400 tokens / turn</div>
+        </div>
+        <div class="m-box">
+          <div class="m-label">Usable Reasoning</div>
+          <div class="m-val color-muted">~25% (Diluted)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Flow Connector -->
+    <div class="center-flow">
+      <div class="flow-pill">
+        <div class="big-stat">-91%</div>
+        <div class="stat-label">Base Burn</div>
+      </div>
+      <div class="flow-arrow">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </div>
+      <div class="flow-pill">
+        <div class="big-stat">+70%</div>
+        <div class="stat-label">Retained Space</div>
+      </div>
+    </div>
+
+    <!-- Card Right: Token Diet LUT Router -->
+    <div class="device-card success">
+      <div class="card-top">
+        <div class="card-top-info">
+          <h2>With Token Diet (LUT Router)</h2>
+          <p>Decoupled root routing + on-demand skills</p>
+        </div>
+        <div class="pill pill-success">Max Reasoning</div>
+      </div>
+
+      <div class="bar-container">
+        <!-- Lean LUT Router -->
+        <div class="bar-segment seg-lut">
+          <div class="seg-title-row">
+            <span class="seg-title">LUT Router Invariants</span>
+            <span class="seg-pct color-blue">&lt; 8% Base</span>
+          </div>
+          <div class="seg-desc">&lt; 750 tokens root rules; skills loaded strictly on demand</div>
+        </div>
+
+        <!-- Abundant Working Memory -->
+        <div class="bar-segment seg-expanded-memory">
+          <div class="seg-title-row">
+            <span class="seg-title">Retained Working Memory for Code & Reasoning</span>
+            <span class="seg-pct color-success">&gt; 92% Usable</span>
+          </div>
+          <div class="seg-desc">Abundant context capacity with laser-focused attention focus</div>
+          <div class="memory-grid">
+            <div class="memory-chip">✓ Full Multi-file Diffs</div>
+            <div class="memory-chip">✓ Comprehensive Test Traces</div>
+            <div class="memory-chip">✓ Deep Architectural Planning</div>
+            <div class="memory-chip">✓ Needle-in-a-Haystack Recall</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-metric-footer">
+        <div class="m-box">
+          <div class="m-label">Base Overhead</div>
+          <div class="m-val color-blue">~750 tokens / turn</div>
+        </div>
+        <div class="m-box">
+          <div class="m-label">Usable Reasoning</div>
+          <div class="m-val color-success">&gt; 92% (Optimal)</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer Steps (Numbered in Apple Watch diagram style) -->
+  <div class="footer-steps">
+    <div class="step-item">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Audit Baseline</div>
+        <div class="step-desc">Inspect filesystem directives and quantify prompt injection costs.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">LUT Routing</div>
+        <div class="step-desc">Shrink root AGENTS.md to &lt;750 tokens with on-demand skill pointers.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Plug Silent Bleed</div>
+        <div class="step-desc">Detect rogue pre-commit hooks and oversized MCP tool declarations.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Sharpen Reasoning</div>
+        <div class="step-desc">Protect frontier model attention span from instruction dilution.</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

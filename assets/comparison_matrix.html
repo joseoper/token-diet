@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px;
+    height: 900px;
+    background-color: #171922;
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(0, 144, 255, 0.08) 0%, transparent 60%),
+      radial-gradient(circle at 90% 90%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+    color: #F8FAFC;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 48px 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #00A3FF;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    color: #FFFFFF;
+  }
+  .header-badge {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #94A3B8;
+  }
+
+  /* Main Grid */
+  .matrix-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.08fr;
+    gap: 24px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .card {
+    background: #1E222D;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+  }
+
+  .card.highlight {
+    background: linear-gradient(180deg, #1E2638 0%, #19202E 100%);
+    border: 1.5px solid #0090FF;
+    box-shadow: 0 0 35px rgba(0, 144, 255, 0.12);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    padding-bottom: 14px;
+  }
+
+  .card-title-group h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+  }
+
+  .card-title-group .examples {
+    font-size: 13px;
+    color: #94A3B8;
+  }
+
+  .card-tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #94A3B8;
+  }
+
+  .card.highlight .card-tag {
+    background: rgba(0, 144, 255, 0.15);
+    color: #38BDF8;
+    border: 1px solid rgba(0, 144, 255, 0.3);
+  }
+
+  /* Rows */
+  .row-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .row-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .card.highlight .row-item {
+    background: rgba(0, 144, 255, 0.03);
+    border: 1px solid rgba(0, 144, 255, 0.08);
+  }
+
+  .row-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748B;
+  }
+
+  .card.highlight .row-label {
+    color: #00A3FF;
+  }
+
+  .row-val {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #E2E8F0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .badge-cross {
+    background: rgba(244, 63, 94, 0.15);
+    color: #FB7185;
+    border: 1px solid rgba(244, 63, 94, 0.3);
+  }
+
+  .badge-warn {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FBBF24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .badge-check {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  /* Bottom Takeaways - Reference Image Style */
+  .footer-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    background: #1B1E28;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 18px 24px;
+  }
+
+  .step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #0084FF;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-content {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #FFFFFF;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: #94A3B8;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="title-group">
+      <div class="subtitle">Architecture & Infrastructure</div>
+      <h1 class="title">Developer Tool Comparison Matrix</h1>
+    </div>
+    <div class="header-badge">
+      Static Structural Auditor vs. Runtime Layer
+    </div>
+  </div>
+
+  <!-- Matrix Grid -->
+  <div class="matrix-grid">
+
+    <!-- Column 1: Gateways -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2>Runtime Gateways</h2>
+          <div class="examples">LiteLLM, Portkey</div>
+        </div>
+        <div class="card-tag">Network Proxy</div>
+      </div>
+      <div class="row-list">
+        <div class="row-item">
+          <div class="row-label">Operating Layer</div>
+          <div class="row-val">Network / Outgoing API Proxy</div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Filesystem Directives</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            Blind to local AGENTS.md & rules
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Git Hook Detection</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            Blind to pre-commit AI scripts
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">CI Budget Enforcement</div>
+          <div class="row-val">
+            <span class="badge-icon badge-warn">!</span>
+            Reactive alerts post-dispatch
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Runtime Latency Impact</div>
+          <div class="row-val">
+            <span class="badge-icon badge-warn">!</span>
+            Adds external network hop
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Code & Syntax Safety</div>
+          <div class="row-val">
+            <span class="badge-icon badge-check">✓</span>
+            Transparent passthrough
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 2: Prompt Compressors -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2>Prompt Compressors</h2>
+          <div class="examples">LLMLingua, Perplexity Filter</div>
+        </div>
+        <div class="card-tag">Model Middleware</div>
+      </div>
+      <div class="row-list">
+        <div class="row-item">
+          <div class="row-label">Operating Layer</div>
+          <div class="row-val">Inference / Runtime Prompt Assembly</div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Filesystem Directives</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            Blind to repository architecture
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Git Hook Detection</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            Blind to pre-commit AI scripts
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">CI Budget Enforcement</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            No pre-merge regression gates
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Runtime Latency Impact</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            CPU/GPU small LM inference lag
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Code & Syntax Safety</div>
+          <div class="row-val">
+            <span class="badge-icon badge-cross">✕</span>
+            Risk of AST & syntax corruption
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 3: Token Diet -->
+    <div class="card highlight">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2>Token Diet</h2>
+          <div class="examples">Structural Context Auditor</div>
+        </div>
+        <div class="card-tag">Pre-Flight & CI/CD</div>
+      </div>
+      <div class="row-list">
+        <div class="row-item">
+          <div class="row-label">Operating Layer</div>
+          <div class="row-val">Local Filesystem & CI Pipeline</div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Filesystem Directives</div>
+          <div class="row-val">
+            <span class="badge-icon badge-check">✓</span>
+            Full audit of AGENTS.md, MCPs, rules
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Git Hook Detection</div>
+          <div class="row-val">
+            <span class="badge-icon badge-check">✓</span>
+            Detects irregular AI leaking hooks
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">CI Budget Enforcement</div>
+          <div class="row-val">
+            <span class="badge-icon badge-check">✓</span>
+            Deterministic regression gates & ceilings
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Runtime Latency Impact</div>
+          <div class="row-val">
+            <span class="badge-icon badge-check">✓</span>
+            Zero runtime overhead (&lt; 10ms static)
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="row-label">Code & Syntax Safety</div>
+          <div class="row-val">
+            <span class="badge-icon badge-check">✓</span>
+            100% deterministic (0 code alteration)
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Steps (Numbered in Apple Watch diagram style) -->
+  <div class="footer-steps">
+    <div class="step-item">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Source Defense</div>
+        <div class="step-desc">Stops context bloat at rest before prompts are sent to models.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Hook & MCP Audit</div>
+        <div class="step-desc">Detects hidden .git hooks and unmetered schema declarations.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">CI Regression Gates</div>
+        <div class="step-desc">Blocks unbudgeted prompt inflation directly in Pull Requests.</div>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Zero Overhead</div>
+        <div class="step-desc">Zero runtime latency, pure Python stdlib, 100% deterministic.</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
