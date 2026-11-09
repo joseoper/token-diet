@@ -13,6 +13,11 @@ Please be respectful, constructive, and considerate of all contributors and user
 3. **Test-Driven Development (TDD):** Every bugfix, heuristic change, or new CLI flag must include accompanying automated unit tests.
 4. **Conventional Commits:** Write clear commit messages using the Conventional Commits format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
 5. **Security & Privacy:** Strictly zero API keys, secrets, personal emails, or machine-specific absolute paths in code or tests.
+6. **Governance & Metadata Integrity:** Keep project metadata in sync with code updates:
+   - Update [`README.md`](README.md) badges if Python support or primary package URLs change.
+   - Update [`SECURITY.md`](SECURITY.md) supported versions table and security invariants when architectural or version boundaries shift.
+   - Maintain [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/) forms aligned with supported operating systems and AI assistants.
+
 
 ## Development Workflow
 
