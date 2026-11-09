@@ -277,9 +277,7 @@ def resolve_target_paths(input_paths: Optional[List[str]] = None, check_local: b
         return resolved
 
     if check_local:
-        local_files = detect_local_prompts(".")
-        if local_files:
-            return local_files
+        return detect_local_prompts(".")
 
     return DEFAULT_PROMPT_PATHS
 
@@ -602,11 +600,17 @@ def render_baseline_report(comparison: Dict[str, Any], max_delta: Optional[float
     print(bold("BASELINE COMPARISON:"))
     print(f"  Baseline: ~{comparison['baseline_tokens']:,d} tokens")
     print(f"  Current:  ~{comparison['current_tokens']:,d} tokens")
-    print(f"  Delta:    {sign}{delta:,d} tokens ({sign}{comparison['delta_percent']}%)")
+    if comparison.get("indeterminate"):
+        print(f"  Delta:    {sign}{delta:,d} tokens (indeterminate from 0 baseline)")
+    else:
+        print(f"  Delta:    {sign}{delta:,d} tokens ({sign}{comparison['delta_percent']}%)")
     if max_delta is None:
         return
     if comparison["exceeded"]:
-        print(red(f"  BUDGET EXCEEDED: growth above the allowed {max_delta}% delta."))
+        if comparison.get("indeterminate"):
+            print(red("  BUDGET EXCEEDED: new tokens introduced from a zero baseline."))
+        else:
+            print(red(f"  BUDGET EXCEEDED: growth above the allowed {max_delta}% delta."))
     else:
         print(green(f"  Within budget: growth is at most {max_delta}%."))
 
@@ -618,6 +622,11 @@ def _check_exit_conditions(
     baseline_exceeded: bool = False,
 ):
     """Handles exit codes for CI/CD gates."""
+    # If gate enforcement flags are set (--strict, --max-tokens), require at least one directive measured
+    if (strict or max_tokens is not None) and summary.get("files_found", 0) == 0:
+        sys.stderr.write("Error: Token budget gate active (--strict or --max-tokens) but 0 prompt directives found.\n")
+        sys.exit(1)
+
     if max_tokens is not None and summary["total_tokens"] > max_tokens:
         sys.exit(1)
     if strict and (summary["alerts"] > 0 or summary["warnings"] > 0):

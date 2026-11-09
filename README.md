@@ -8,7 +8,7 @@ Zero-dependency CLI for **Claude Code**, **Cursor**, **Codex**, **Gemini**, and 
 
 ## Why?
 
-AI coding assistants inject instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) into the system prompt on **every single turn**. A bloated 25 KB prompt file forces the model to re-process ~6,000 tokens on every message, draining rate limits and breaking prompt cache discounts.
+AI coding assistants inject instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) into the system prompt on **every single turn**. A bloated 25 KB prompt file forces the model to re-process ~6,000 tokens on every message, draining context windows and paying full input rates on prompt cache misses.
 
 Worse, some local tools install hidden `pre-commit` hooks that send your entire git diff to an LLM on every commit.
 
@@ -312,15 +312,30 @@ token-diet/
 ---
 
 ## Core Methodology: The 6 Vectors of Token Leakage
-
+ 
 Token Diet is built on empirical analysis of how developer environments silently deplete API quotas:
 
-1. **Global Prompt Bloat:** Monolithic instruction files (`CLAUDE.md`, `AGENTS.md`) exceeding 20 KB inject tens of thousands of static tokens on every turn. *Solution: Keep root directives under 3 KB (<750 tokens) and route to on-demand skills.*
-2. **Invisible Git Hooks:** Pre-commit hooks that intercept local commits to invoke cloud LLM reviews drain quotas without developer consent. *Solution: Keep local commits deterministic; reserve AI reviews for PR gates.*
-3. **Reasoning Effort Inflation:** Running frontier models at `high` reasoning effort for simple syntax or diagnostic queries generates thousands of hidden chain-of-thought tokens. *Solution: Default to `medium` or `low`.*
-4. **Static MCP Schemas:** Registering dozens of MCP tools serializes massive JSON parameter schemas into system prompts. *Solution: Prune unused tool servers and enforce lazy-loading.*
-5. **Prompt Cache Invalidation:** Injecting dynamic timestamps or changing session IDs at the start of instructions destroys provider prompt caching discounts (up to 90%). *Solution: Maintain immutable instruction prefixes.*
-6. **In-Session Runtime Inefficiencies:** Agents loading entire 1,500-line files to check one function, overwriting whole files instead of focused diffs, or running uncompacted 100k+ token threads. *Solution: Enforce active runtime hygiene (grep-first, line-range reads, targeted diffs, and context compaction thresholds; see [Remediation Playbook Phase 4](docs/remediation-playbook.md#phase-4-in-session-runtime-hygiene-active-execution-guards)).*
+| Vector | Nature | Status in token-diet | Solution |
+|---|:---:|:---:|---|
+| **1. Global Prompt Bloat** | Static Directives | `[AUDITED]` | Scanned by `token-diet`. Keep root directives < 3 KB (< 750 tokens) and route to on-demand skills. |
+| **2. Invisible Git Hooks** | Execution Leak | `[AUDITED]` | Neutralized with `token-diet --fix-hooks`. Keep commits deterministic; reserve AI reviews for PR CI gates. |
+| **3. Reasoning Effort Inflation** | Config Overrun | `[ADVISORY]` | Guidance in [Playbook §1.3](docs/remediation-playbook.md#13-rationalize-reasoning-effort--multi-agent-spawning). Default reasoning to `medium` or `low`. |
+| **4. Static MCP Schemas** | Injection Floor | `[AUDITED]` | Scanned with `token-diet --mcp`. Prune unused tool servers and enforce lazy-loading. |
+| **5. Cache Prefix Invalidation** | Caching Inefficiency | `[ADVISORY]` | Guidance in [Playbook §3.3](docs/remediation-playbook.md#33-preserve-prompt-cache-prefix-immutability). Maintain immutable, deterministic instruction prefixes. |
+| **6. In-Session Inefficiencies** | Runtime History | `[ADVISORY]` | Guidance in [Playbook Phase 4](docs/remediation-playbook.md#phase-4-in-session-runtime-hygiene-active-execution-guards). Line-range reads, targeted diffs, and 80k-token compaction cutoffs. |
+
+---
+
+## Limitations & Technical Accuracy
+
+To maintain zero runtime dependencies and millisecond-level execution, `token-diet` operates with clear, deliberate technical boundaries:
+
+| Dimension | How it Works | Operational Boundary |
+|---|---|---|
+| **Token Estimation** | Fast heuristic (~4 bytes per token) | Heuristic estimation without provider-specific tokenizer overhead. Code density (~2.5-3.2 bytes/token) and non-Latin scripts will have slight variance. |
+| **MCP Schemas** | Static analysis of local config declarations | Reports declared schema overhead. Schemas fetched dynamically by servers at runtime via protocol handshakes are not measurable statically. |
+| **Git Hooks Remediation** | Regex and boundary-aware command matching | `--fix-hooks` neutralizes detected AI commands and creates `.bak` backups. Verify your hook manually if using complex custom scripts. |
+| **Directive Scope** | Standard file patterns (`AGENTS.md`, `.cursorrules`, etc.) | Audits well-known directives. Custom tooling with obscure instruction naming paths should be passed explicitly as target paths. |
 
 ---
 

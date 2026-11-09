@@ -81,11 +81,18 @@ def compare_tokens(current_tokens: int, baseline_tokens: int) -> Dict[str, Any]:
     Compare current tokens against baseline tokens and compute delta metrics.
 
     Returns a dict with baseline_tokens, current_tokens, delta_tokens,
-    delta_percent (rounded to 2 decimal places), and direction.
+    delta_percent (rounded to 2 decimal places), direction, and indeterminate.
     """
     delta_tokens = current_tokens - baseline_tokens
+    indeterminate = False
     if baseline_tokens > 0:
         delta_percent = round(delta_tokens / baseline_tokens * 100.0, 2)
+    elif baseline_tokens == 0:
+        if current_tokens > 0:
+            delta_percent = float("inf")
+            indeterminate = True
+        else:
+            delta_percent = 0.0
     else:
         delta_percent = 0.0
 
@@ -96,25 +103,32 @@ def compare_tokens(current_tokens: int, baseline_tokens: int) -> Dict[str, Any]:
     else:
         direction = "unchanged"
 
-    return {
+    result = {
         "baseline_tokens": baseline_tokens,
         "current_tokens": current_tokens,
         "delta_tokens": delta_tokens,
         "delta_percent": delta_percent,
         "direction": direction,
     }
+    if indeterminate:
+        result["indeterminate"] = True
+
+    return result
 
 
 def check_budget(current_tokens: int, baseline_tokens: int, max_delta_percent: float) -> Dict[str, Any]:
     """
     Check if token growth exceeds the maximum allowed delta percentage budget.
 
-    Budget is exceeded only when direction is 'increase' and delta_percent
-    is strictly greater than max_delta_percent.
+    Budget is exceeded if direction is 'increase' and delta_percent is greater than max_delta_percent,
+    or if baseline was 0 and new tokens were introduced (indeterminate infinite growth).
     """
     comparison = compare_tokens(current_tokens, baseline_tokens)
     max_delta = float(max_delta_percent)
-    exceeded = comparison["direction"] == "increase" and comparison["delta_percent"] > max_delta
+    if comparison.get("indeterminate"):
+        exceeded = True
+    else:
+        exceeded = comparison["direction"] == "increase" and comparison["delta_percent"] > max_delta
     comparison["max_delta_percent"] = max_delta
     comparison["exceeded"] = exceeded
     return comparison

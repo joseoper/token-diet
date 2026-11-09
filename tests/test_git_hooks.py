@@ -293,6 +293,14 @@ class TestGitHooks(unittest.TestCase):
             ["gentle-ai", "gemini", "ollama"],
         )
 
+        # False positives avoidance: variables and path exports
+        self.assertEqual(has_ai_invocation("export PATH=$HOME/.claude/bin:$PATH"), [])
+        self.assertEqual(has_ai_invocation("gemini_count=12"), [])
+        self.assertEqual(has_ai_invocation("echo opencode.json"), [])
+
+        # Subcommand invocation with operators
+        self.assertEqual(has_ai_invocation("npm test && claude review"), ["claude"])
+
 
 if __name__ == "__main__":
     unittest.main()

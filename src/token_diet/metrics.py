@@ -15,11 +15,15 @@ THRESHOLD_WARN_BYTES = 4_000   # ~1,000 tokens
 THRESHOLD_ALERT_BYTES = 16_000 # ~4,000 tokens
 
 
-def estimate_tokens(char_count: int) -> int:
-    """Estimates tokens based on a conservative heuristic of ~4 characters per token."""
-    if char_count <= 0:
+def estimate_tokens(size_in_bytes: int) -> int:
+    """
+    Estimates tokens based on a conservative heuristic of ~4 bytes/characters per token.
+    Note: Token density varies by content type (code: ~2.5-3.2 bytes/token, prose: ~4 bytes/token).
+    This serves as a fast, zero-dependency baseline estimate.
+    """
+    if size_in_bytes <= 0:
         return 0
-    return char_count // 4
+    return size_in_bytes // 4
 
 
 def classify_size(size_bytes: int) -> Tuple[str, str]:

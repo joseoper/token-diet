@@ -150,16 +150,16 @@ class TestCompareTokens(unittest.TestCase):
 
     def test_zero_baseline(self):
         res = compare_tokens(500, 0)
-        self.assertEqual(
-            res,
-            {
-                "baseline_tokens": 0,
-                "current_tokens": 500,
-                "delta_tokens": 500,
-                "delta_percent": 0.0,
-                "direction": "increase",
-            },
-        )
+        self.assertEqual(res["baseline_tokens"], 0)
+        self.assertEqual(res["current_tokens"], 500)
+        self.assertEqual(res["delta_tokens"], 500)
+        self.assertEqual(res["delta_percent"], float("inf"))
+        self.assertEqual(res["direction"], "increase")
+        self.assertTrue(res["indeterminate"])
+
+        res_zero = compare_tokens(0, 0)
+        self.assertEqual(res_zero["delta_percent"], 0.0)
+        self.assertFalse(res_zero.get("indeterminate", False))
 
     def test_rounding_two_decimals(self):
         res = compare_tokens(301, 300)
@@ -195,9 +195,13 @@ class TestCheckBudget(unittest.TestCase):
 
     def test_zero_baseline_with_growth(self):
         res = check_budget(100, 0, 5.0)
-        self.assertFalse(res["exceeded"])
+        self.assertTrue(res["exceeded"])
         self.assertEqual(res["direction"], "increase")
-        self.assertEqual(res["delta_percent"], 0.0)
+        self.assertEqual(res["delta_percent"], float("inf"))
+        self.assertTrue(res["indeterminate"])
+
+        res_zero = check_budget(0, 0, 5.0)
+        self.assertFalse(res_zero["exceeded"])
 
     def test_negative_budget_with_any_increase(self):
         # Normal baseline with growth under negative budget fails

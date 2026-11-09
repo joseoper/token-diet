@@ -364,6 +364,18 @@ class TestCliFlags(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertIn("Baseline file not found", err)
 
+    def test_gate_fails_when_zero_directives_found_with_strict(self):
+        with tempfile.TemporaryDirectory() as empty_dir:
+            code, _, err = self._run(["--strict"], cwd=empty_dir)
+            self.assertEqual(code, 1)
+            self.assertIn("Token budget gate active", err)
+
+    def test_gate_fails_when_zero_directives_found_with_max_tokens(self):
+        with tempfile.TemporaryDirectory() as empty_dir:
+            code, _, err = self._run(["--max-tokens", "2500"], cwd=empty_dir)
+            self.assertEqual(code, 1)
+            self.assertIn("Token budget gate active", err)
+
 
 if __name__ == "__main__":
     unittest.main()

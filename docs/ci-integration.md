@@ -38,7 +38,7 @@ jobs:
 
       - name: Install Token Diet
         run: |
-          pip install token-diet
+          pip install token-diet-cli
 
       - name: Run Token Footprint Audit
         run: |
@@ -47,7 +47,8 @@ jobs:
 
       - name: Assert Token Threshold Gate
         run: |
-          # Fails the PR build if any rule file exceeds strict thresholds or total tokens exceed 2,500
+          # Fails the PR build if any rule file exceeds strict thresholds or total tokens exceed 2,500.
+          # Note: If no prompt directives are found, --strict and --max-tokens fail with an explicit error.
           token-diet --max-tokens 2500 --strict
 ```
 
@@ -140,7 +141,7 @@ Commit the baseline on your default branch, then gate every pull request against
           token-diet --baseline token-baseline.json --max-delta 5
 ```
 
-`--max-delta 5` allows up to 5% total growth and exits `1` beyond that. A decrease, an unchanged total, or growth exactly at the budget passes, so the gate never fails on noise.
+`--max-delta 5` allows up to 5% total growth and exits `1` beyond that. A decrease, an unchanged total, or growth exactly at the budget passes, so the gate never fails on noise. If the baseline has 0 tokens, any newly introduced tokens are treated as indeterminate growth and fail the budget gate immediately.
 
 Keep the baseline inside the repository when the base branch is not available at build time:
 

@@ -7,6 +7,7 @@ hooks paths, and detection of unmonitored AI review tool invocations.
 """
 
 import os
+import re
 from typing import List, Optional
 
 AI_HOOK_KEYWORDS = ["gga", "opencode", "gentle-ai", "claude", "gemini", "ollama", "llm review"]
@@ -140,10 +141,39 @@ def resolve_hooks_dir(repo_dir: str = ".") -> Optional[str]:
     return os.path.abspath(os.path.normpath(os.path.join(common_dir, "hooks")))
 
 
+def _tokenize_command_line(line: str) -> List[str]:
+    """Splits a shell line by pipes, logical operators, subshells, and semicolons."""
+    subcommands = re.split(r";|&&|\|\||\||&|\$\(|\`", line)
+    return [cmd.strip() for cmd in subcommands if cmd.strip()]
+
+
 def has_ai_invocation(line: str) -> List[str]:
     """Inspects a script line for invocations of AI review tools, returning matched keywords."""
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
         return []
-    lower = stripped.lower()
-    return [kw for kw in AI_HOOK_KEYWORDS if kw in lower]
+
+    matched: List[str] = []
+    subcommands = _tokenize_command_line(stripped)
+
+    for subcmd in subcommands:
+        tokens = subcmd.split()
+        if not tokens:
+            continue
+        first_token = tokens[0].lower()
+        # Skip pure variable assignments like FOO=12 or export PATH=...
+        if "=" in first_token and not (first_token.startswith("exec") or first_token.startswith("env")):
+            continue
+        if first_token == "export" and len(tokens) > 1 and "=" in tokens[1]:
+            continue
+
+        lower_subcmd = subcmd.lower()
+        for kw in AI_HOOK_KEYWORDS:
+            if kw in matched:
+                continue
+            # Match keyword bounded by non-word/non-path chars
+            pattern = r"(?<![\w\-\.\/])" + re.escape(kw) + r"(?![\w\-\.\/])"
+            if re.search(pattern, lower_subcmd):
+                matched.append(kw)
+
+    return [kw for kw in AI_HOOK_KEYWORDS if kw in matched]
