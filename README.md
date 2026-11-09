@@ -35,7 +35,9 @@ Most LLM optimization tooling operates downstream at runtime—proxying HTTP tra
 
 * **Runtime Gateways (LiteLLM, Portkey):** Handle API routing, multi-provider fallbacks, and centralized usage logging. However, they are completely blind to uncommitted local directives, invisible `.git/hooks/pre-commit` scripts, or workstation-wide prompt bloat. By the time a gateway sees the payload, the tokens have already been loaded, serialized, and billed.
 * **Runtime Compressors (LLMLingua):** Use small language models or perplexity filtering to drop prompt tokens dynamically before dispatch. While useful for free-form prose, runtime compression introduces noticeable latency, burns local compute cycles, and risks damaging code syntax, indentation, and strict architectural constraints.
-* **Token Diet:** Operates **at rest** as a static structural context auditor and linter. It prevents context pollution at the architectural source—before prompts are sent, before PRs are merged, and before rogue hooks leak diffs to external models.
+* **Behavioral Prompt Guides (e.g., Agensi's Cut Agent Token Costs):** Broad conceptual frameworks that coach agents to "be concise" and choose smaller models. While valuable for in-session behavior, prompt guides are not executable software—they rely entirely on the LLM's willingness to remember instructions under severe context drift, cannot measure exact file bytes or MCP schemas, and cannot fail a CI pull request build.
+* **Token Diet:** Operates **at rest** as a static structural context auditor and deterministic linter. It prevents context pollution at the architectural source—measuring exact filesystem artifacts, neutralizing unmonitored hooks programmatically, and blocking PR regressions in CI (< 10 ms, zero dependencies).
+
 
 ---
 
