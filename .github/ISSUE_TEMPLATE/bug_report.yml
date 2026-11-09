@@ -1,0 +1,76 @@
+name: "🐛 Bug Report"
+description: File a bug report to help us improve token-diet
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue!
+        Please verify you are running the latest version of `token-diet` before filing.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the unexpected behavior is.
+      placeholder: When running `token-diet --fix-hooks`, the command failed with...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps To Reproduce
+      description: Steps or commands to reproduce the issue.
+      placeholder: |
+        1. In a git repository, run '...'
+        2. Inspect output
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Command Output & Logs
+      description: Paste the exact terminal output (feel free to sanitize any private repo names).
+      render: shell
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (Ubuntu/Debian)
+        - Linux (Arch/Fedora/Other)
+        - Windows (WSL)
+        - Windows (Native)
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      placeholder: "e.g. Python 3.12.2"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: token-diet Version
+      placeholder: "e.g. 0.2.3 (run 'token-diet --help')"
+    validations:
+      required: true

@@ -1,0 +1,47 @@
+name: "💡 Feature Request"
+description: Suggest an idea or enhancement for token-diet
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a new feature or improvement!
+        Remember that `token-diet` strictly maintains zero external dependencies to preserve instant startup and prevent supply-chain vulnerabilities.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Limitation
+      description: Is your feature request related to a problem or context limitation?
+      placeholder: I am always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / CLI Behavior
+      description: Describe the solution you'd like to see, including suggested CLI flags or output format.
+      placeholder: Add a flag `--json` that outputs structured JSON diagnostic results...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered.
+
+  - type: dropdown
+    id: target-agent
+    attributes:
+      label: Targeted AI Agent / Workflow (if applicable)
+      options:
+        - General / All Assistants
+        - Claude Code
+        - Codex / OpenAI
+        - Cursor (.cursorrules)
+        - Gemini Code Assist
+        - OpenCode
+        - Git Hooks / CI Gate

@@ -1,5 +1,12 @@
 # token-diet
 
+[![CI](https://img.shields.io/github/actions/workflow/status/joseoper/token-diet/ci.yml?branch=main&label=CI&logo=github&style=flat-square)](https://github.com/joseoper/token-diet/actions)
+[![Release](https://img.shields.io/github/v/release/joseoper/token-diet?style=flat-square&color=blue)](https://github.com/joseoper/token-diet/releases/latest)
+[![Homebrew](https://img.shields.io/badge/homebrew-joseoper%2Ftap-orange?style=flat-square&logo=homebrew)](https://github.com/joseoper/homebrew-tap)
+[![Python](https://img.shields.io/badge/python-3.8%20%7C%203.10--3.13-blue?style=flat-square&logo=python)](pyproject.toml)
+[![Dependencies](https://img.shields.io/badge/dependencies-0%20external-success?style=flat-square)](src/token_diet)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blueviolet.svg?style=flat-square)](LICENSE)
+
 Audit token footprint and detect silent context leaks in AI agent workflows.
 
 Zero-dependency CLI for **Claude Code**, **Cursor**, **Codex**, **Gemini**, and **OpenCode**.
