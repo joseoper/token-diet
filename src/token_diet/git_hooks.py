@@ -171,9 +171,11 @@ def has_ai_invocation(line: str) -> List[str]:
         for kw in AI_HOOK_KEYWORDS:
             if kw in matched:
                 continue
-            # Match keyword bounded by non-word/non-path chars
-            pattern = r"(?<![\w\-\.\/])" + re.escape(kw) + r"(?![\w\-\.\/])"
+            # Match keyword bounded by non-word/non-hyphen chars before, and non-word/non-path/non-extension chars after
+            # This detects absolute/relative paths (/usr/bin/claude, ./claude) while ignoring extensions (.json, .py)
+            pattern = r"(?<![\w\-])" + re.escape(kw) + r"(?![\w\-\.\/])"
             if re.search(pattern, lower_subcmd):
                 matched.append(kw)
+
 
     return [kw for kw in AI_HOOK_KEYWORDS if kw in matched]

@@ -73,8 +73,24 @@ def audit_mcp_config(filepath: str) -> Dict[str, Any]:
         }
 
     try:
+        st = os.stat(filepath)
+        import stat
+        if not stat.S_ISREG(st.st_mode):
+            return {
+                "path": filepath,
+                "exists": False,
+                "format": "unknown",
+                "servers": [],
+                "total_servers": 0,
+                "total_bytes": 0,
+                "total_tokens": 0,
+                "error": f"Not a regular file: {filepath}",
+                "status": "ERROR",
+                "severity": "critical",
+            }
+        MAX_SAFE_BYTES = 10 * 1024 * 1024  # 10 MB
         with open(filepath, "r", encoding="utf-8") as f:
-            content = f.read()
+            content = f.read(MAX_SAFE_BYTES)
         data = json.loads(content)
     except Exception as e:
         return {

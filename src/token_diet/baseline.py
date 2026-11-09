@@ -49,8 +49,26 @@ def load_baseline(filepath: str) -> Dict[str, Any]:
         }
 
     try:
+        st = os.stat(filepath)
+        import stat
+        if not stat.S_ISREG(st.st_mode):
+            return {
+                "ok": False,
+                "tokens": None,
+                "path": filepath,
+                "error": f"Baseline is not a regular file: {filepath}",
+            }
+        MAX_SAFE_BYTES = 10 * 1024 * 1024  # 10 MB
         with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            content = f.read(MAX_SAFE_BYTES + 1)
+        if len(content) > MAX_SAFE_BYTES:
+            return {
+                "ok": False,
+                "tokens": None,
+                "path": filepath,
+                "error": f"Baseline file exceeds maximum size limit (10MB): {filepath}",
+            }
+        data = json.loads(content)
     except Exception as e:
         return {
             "ok": False,
@@ -122,13 +140,17 @@ def check_budget(current_tokens: int, baseline_tokens: int, max_delta_percent: f
 
     Budget is exceeded if direction is 'increase' and delta_percent is greater than max_delta_percent,
     or if baseline was 0 and new tokens were introduced (indeterminate infinite growth).
+    Rejects NaN / Inf in max_delta_percent by treating invalid configurations as exceeded.
     """
     comparison = compare_tokens(current_tokens, baseline_tokens)
     max_delta = float(max_delta_percent)
-    if comparison.get("indeterminate"):
+    if not math.isfinite(max_delta) or math.isnan(max_delta):
+        exceeded = True
+    elif comparison.get("indeterminate"):
         exceeded = True
     else:
         exceeded = comparison["direction"] == "increase" and comparison["delta_percent"] > max_delta
     comparison["max_delta_percent"] = max_delta
     comparison["exceeded"] = exceeded
     return comparison
+

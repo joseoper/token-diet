@@ -98,9 +98,23 @@ def audit_sections(filepath: str) -> Dict[str, Any]:
         }
 
     try:
+        st = os.stat(filepath)
+        import stat
+        if not stat.S_ISREG(st.st_mode):
+            return {
+                "path": filepath,
+                "exists": False,
+                "error": f"Not a regular file: {filepath}",
+                "bytes": 0,
+                "estimated_tokens": 0,
+                "status": "ERROR",
+                "severity": "critical",
+                "sections": [],
+            }
+        MAX_SAFE_BYTES = 10 * 1024 * 1024  # 10 MB
         with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
-        size = os.path.getsize(filepath)
+            content = f.read(MAX_SAFE_BYTES)
+        size = st.st_size
         tokens = estimate_tokens(size)
         status, severity = classify_size(size)
         sections = split_sections(content)

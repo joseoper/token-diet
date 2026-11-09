@@ -10,6 +10,10 @@ import os
 import sys
 import json
 import argparse
+import math
+import re
+import stat
+import tempfile
 from typing import List, Dict, Any, Optional, Tuple
 
 from .metrics import (
@@ -19,9 +23,35 @@ from .metrics import (
     estimate_tokens,
 )
 from .baseline import check_budget, compare_tokens, load_baseline
-from .git_hooks import AI_HOOK_KEYWORDS, has_ai_invocation, resolve_hooks_dir
+from .git_hooks import (
+    AI_HOOK_KEYWORDS,
+    has_ai_invocation,
+    resolve_common_dir,
+    resolve_git_dir,
+    resolve_hooks_dir,
+)
 from .mcp_audit import audit_mcp_overhead
 from .sections import audit_sections_for_paths
+
+ANSI_OR_CONTROL_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def sanitize_text(text: str) -> str:
+    """Strips terminal escape sequences and non-printable control characters."""
+    return ANSI_OR_CONTROL_RE.sub("", text)
+
+
+def _validate_max_delta(value_str: str) -> float:
+    """Validates that --max-delta argument is a finite float."""
+    try:
+        val = float(value_str)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid float value: '{value_str}'")
+    if not math.isfinite(val) or math.isnan(val):
+        raise argparse.ArgumentTypeError(f"--max-delta must be a finite percentage, got: '{value_str}'")
+    return val
+
+
 
 DEFAULT_PROMPT_PATHS = [
     os.path.expanduser("~/.codex/AGENTS.md"),
@@ -196,7 +226,39 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "message": "No Git hooks directory detected for this repository.",
         }
 
+    # Ensure hooks directory is contained within the repository or git directory
+    repo_abs = os.path.abspath(repo_dir)
+    git_dir = resolve_git_dir(repo_dir)
+    common_dir = resolve_common_dir(git_dir) if git_dir else None
+
+    hooks_abs = os.path.abspath(hooks_dir)
+    is_contained = (
+        hooks_abs == repo_abs
+        or hooks_abs.startswith(repo_abs + os.sep)
+        or (git_dir and (hooks_abs == git_dir or hooks_abs.startswith(git_dir + os.sep)))
+        or (common_dir and (hooks_abs == common_dir or hooks_abs.startswith(common_dir + os.sep)))
+    )
+    if not is_contained:
+        return {
+            "fixed": False,
+            "hook_path": os.path.join(hooks_dir, "pre-commit"),
+            "backup_path": None,
+            "disabled_count": 0,
+            "error": "Hooks directory outside repository boundary",
+            "message": f"Refusing to modify hooks outside repository boundary: {hooks_abs}",
+        }
+
     hook_path = os.path.join(hooks_dir, "pre-commit")
+    if os.path.islink(hook_path):
+        return {
+            "fixed": False,
+            "hook_path": hook_path,
+            "backup_path": None,
+            "disabled_count": 0,
+            "error": "Refusing to modify hook through symlink",
+            "message": f"Pre-commit hook is a symlink: {hook_path}. Refusing to modify target through symlink.",
+        }
+
     if not os.path.isfile(hook_path):
         return {
             "fixed": False,
@@ -207,6 +269,18 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
         }
 
     try:
+        orig_stat = os.lstat(hook_path)
+
+        if not stat.S_ISREG(orig_stat.st_mode):
+            return {
+                "fixed": False,
+                "hook_path": hook_path,
+                "backup_path": None,
+                "disabled_count": 0,
+                "error": "Not a regular file",
+                "message": f"Pre-commit hook is not a regular file: {hook_path}",
+            }
+
         with open(hook_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
 
@@ -235,13 +309,47 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             }
 
         backup_path = hook_path + ".bak"
-        with open(backup_path, "w", encoding="utf-8") as f:
+        if os.path.islink(backup_path):
+            return {
+                "fixed": False,
+                "hook_path": hook_path,
+                "backup_path": None,
+                "disabled_count": 0,
+                "error": "Symlink detected at backup path",
+                "message": f"Backup target is a symlink: {backup_path}. Refusing to write backup.",
+            }
+
+        # Write backup safely (create or overwrite regular file safely with mode 0o600 or orig_stat)
+        backup_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+        backup_fd = os.open(backup_path, backup_flags, 0o600)
+        with os.fdopen(backup_fd, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
-        mode = os.stat(hook_path).st_mode
-        with open(hook_path, "w", encoding="utf-8") as f:
-            f.writelines(modified_lines)
-        os.chmod(hook_path, mode)
+        # Atomic replacement for hook_path
+        hooks_dir = os.path.dirname(hook_path)
+        with tempfile.NamedTemporaryFile("w", dir=hooks_dir, delete=False, encoding="utf-8") as tmp:
+            tmp.writelines(modified_lines)
+            temp_name = tmp.name
+
+        try:
+            os.chmod(temp_name, orig_stat.st_mode)
+            # Verify original inode didn't switch to a symlink right before rename
+            current_stat = os.lstat(hook_path)
+            if os.path.islink(hook_path) or current_stat.st_ino != orig_stat.st_ino:
+                os.remove(temp_name)
+                return {
+                    "fixed": False,
+                    "hook_path": hook_path,
+                    "backup_path": backup_path,
+                    "disabled_count": 0,
+                    "error": "TOCTOU race detected",
+                    "message": "File status changed during remediation; aborting replacement.",
+                }
+            os.replace(temp_name, hook_path)
+        except Exception:
+            if os.path.exists(temp_name):
+                os.remove(temp_name)
+            raise
 
         return {
             "fixed": True,
@@ -370,10 +478,11 @@ def main():
     )
     parser.add_argument(
         "--max-delta",
-        type=float,
+        type=_validate_max_delta,
         metavar="PERCENT",
         help="Exit with code 1 if total estimated tokens grow more than PERCENT over --baseline.",
     )
+
     args = parser.parse_args()
 
     if args.max_delta is not None and args.baseline is None:
@@ -543,7 +652,7 @@ def render_sections_report(report: Dict[str, Any]) -> None:
         print(f'{"Line":>6} | {"Heading":<40} | {"Bytes":>9} | {"Tokens":>9} | {"Status":>8}')
         print("-" * 80)
         for section in entry["sections"]:
-            heading = section["heading"]
+            heading = sanitize_text(section["heading"])
             if len(heading) > 38:
                 heading = heading[:35] + "..."
             badge = status_badge(section["status"])
@@ -578,10 +687,11 @@ def render_mcp_report(report: Dict[str, Any]) -> None:
         print(f'{"Server":<30} | {"Transport":<9} | {"Tools":>5} | {"Bytes":>9} | {"Tokens":>9} | {"Status":>8}')
         print("-" * 80)
         for server in config["servers"]:
-            name = server["name"]
+            name = sanitize_text(server["name"])
             if len(name) > 28:
                 name = name[:25] + "..."
             badge = status_badge(server["status"])
+
             print(
                 f'{name:<30} | {server["transport"]:<9} | {server["tool_count"]:>5,d} | '
                 f'{server["bytes"]:>9,d} | {server["estimated_tokens"]:>9,d} | {badge:>17}'
