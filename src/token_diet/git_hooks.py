@@ -141,6 +141,30 @@ def resolve_hooks_dir(repo_dir: str = ".") -> Optional[str]:
     return os.path.abspath(os.path.normpath(os.path.join(common_dir, "hooks")))
 
 
+def _strip_inline_comment(line: str) -> str:
+    """Strips unquoted shell comments (#) from a line."""
+    in_single = False
+    in_double = False
+    escaped = False
+    for i, ch in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            continue
+        if ch == "#" and not in_single and not in_double:
+            if i == 0 or line[i - 1].isspace() or line[i - 1] in ";|&":
+                return line[:i]
+    return line
+
+
 def _tokenize_command_line(line: str) -> List[str]:
     """Splits a shell line by pipes, logical operators, subshells, and semicolons."""
     subcommands = re.split(r";|&&|\|\||\||&|\$\(|\`", line)
@@ -149,7 +173,7 @@ def _tokenize_command_line(line: str) -> List[str]:
 
 def has_ai_invocation(line: str) -> List[str]:
     """Inspects a script line for invocations of AI review tools, returning matched keywords."""
-    stripped = line.strip()
+    stripped = _strip_inline_comment(line).strip()
     if not stripped or stripped.startswith("#"):
         return []
 
@@ -161,6 +185,8 @@ def has_ai_invocation(line: str) -> List[str]:
         if not tokens:
             continue
         first_token = tokens[0].lower()
+        if first_token in ("echo", "printf"):
+            continue
         # Skip pure variable assignments like FOO=12 or export PATH=...
         if "=" in first_token and not (first_token.startswith("exec") or first_token.startswith("env")):
             continue

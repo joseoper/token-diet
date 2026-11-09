@@ -112,9 +112,31 @@ def audit_sections(filepath: str) -> Dict[str, Any]:
                 "sections": [],
             }
         MAX_SAFE_BYTES = 10 * 1024 * 1024  # 10 MB
-        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read(MAX_SAFE_BYTES)
         size = st.st_size
+        if size > MAX_SAFE_BYTES:
+            return {
+                "path": filepath,
+                "exists": False,
+                "error": f"File exceeds maximum size limit (10MB): {filepath}",
+                "bytes": 0,
+                "estimated_tokens": 0,
+                "status": "ERROR",
+                "severity": "critical",
+                "sections": [],
+            }
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read(MAX_SAFE_BYTES + 1)
+        if len(content) > MAX_SAFE_BYTES:
+            return {
+                "path": filepath,
+                "exists": False,
+                "error": f"File exceeds maximum size limit (10MB): {filepath}",
+                "bytes": 0,
+                "estimated_tokens": 0,
+                "status": "ERROR",
+                "severity": "critical",
+                "sections": [],
+            }
         tokens = estimate_tokens(size)
         status, severity = classify_size(size)
         sections = split_sections(content)

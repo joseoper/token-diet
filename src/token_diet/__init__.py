@@ -44,7 +44,7 @@ from token_diet.sections import (
     split_sections,
 )
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 __all__ = [
     "estimate_tokens",
     "audit_file",

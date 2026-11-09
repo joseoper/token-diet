@@ -156,6 +156,132 @@ class TestSecurityHardening(unittest.TestCase):
         self.assertNotIn("\x1b", sanitized)
         self.assertNotIn("\a", sanitized)
 
+    def test_fix_git_hooks_rejects_symlinked_directory_escape(self):
+        """Verify fix_git_hooks refuses to write when hooks directory traverses a symlink outside repo."""
+        repo_dir = os.path.join(self.test_dir, "repo")
+        git_dir = os.path.join(repo_dir, ".git")
+        os.makedirs(git_dir, exist_ok=True)
+
+        external_hooks = os.path.join(self.test_dir, "external_hooks")
+        os.makedirs(external_hooks, exist_ok=True)
+        external_hook = os.path.join(external_hooks, "pre-commit")
+        with open(external_hook, "w") as f:
+            f.write("#!/bin/sh\nclaude review\n")
+
+        # Create an in-repo symlink pointing to the external directory
+        in_repo_symlink = os.path.join(repo_dir, "linked_hooks")
+        os.symlink(external_hooks, in_repo_symlink)
+
+        # Configure core.hooksPath using the in-repo symlink
+        config_path = os.path.join(git_dir, "config")
+        with open(config_path, "w") as f:
+            f.write(f"[core]\n\thooksPath = {in_repo_symlink}\n")
+
+        result = fix_git_hooks(repo_dir)
+        self.assertFalse(result["fixed"])
+        self.assertIn("outside repository boundary", result["error"].lower())
+
+        # Verify external hook was untouched and no backup was created
+        with open(external_hook, "r") as f:
+            self.assertIn("claude review", f.read())
+        self.assertFalse(os.path.exists(external_hook + ".bak"))
+
+    def test_fix_git_hooks_rejects_oversized_hook_file(self):
+        """Verify fix_git_hooks refuses to process hook files exceeding 10 MB."""
+        repo_dir = os.path.join(self.test_dir, "repo")
+        git_dir = os.path.join(repo_dir, ".git")
+        hooks_dir = os.path.join(git_dir, "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+
+        hook_path = os.path.join(hooks_dir, "pre-commit")
+        with open(hook_path, "wb") as f:
+            f.truncate(10 * 1024 * 1024 + 1024)
+
+        result = fix_git_hooks(repo_dir)
+        self.assertFalse(result["fixed"])
+        self.assertIn("maximum size limit", result["error"].lower())
+
+    def test_has_ai_invocation_ignores_inline_comments(self):
+        """Verify inline shell comments do not trigger false positive AI keyword matches."""
+        self.assertEqual(has_ai_invocation("pytest # test gemini integration"), [])
+        self.assertEqual(has_ai_invocation("make check # run claude validator"), [])
+        self.assertEqual(has_ai_invocation("echo 'testing # gemini'"), [])
+        self.assertEqual(has_ai_invocation("gemini review # real invocation with comment"), ["gemini"])
+
+    def test_sections_rejects_oversized_markdown(self):
+        """Verify audit_sections refuses markdown files exceeding 10 MB."""
+        oversized_file = os.path.join(self.test_dir, "huge.md")
+        with open(oversized_file, "wb") as f:
+            f.truncate(10 * 1024 * 1024 + 1024)
+
+        result = audit_sections(oversized_file)
+        self.assertFalse(result["exists"])
+        self.assertEqual(result["status"], "ERROR")
+        self.assertIn("maximum size limit", result["error"].lower())
+
+    def test_render_reports_sanitize_ansi_strings(self):
+        """Verify report renderers strip ANSI sequences from file paths and error messages."""
+        import io
+        import sys
+        from token_diet.cli import render_sections_report, render_mcp_report
+
+        malicious_path = "/tmp/fake_\x1b[2J\x1b[Hdoc.md"
+        malicious_error = "SyntaxError: \x1b[31;1mboom\x1b[0m\a"
+
+        # Test render_sections_report
+        section_payload = {
+            "files": [
+                {
+                    "path": malicious_path,
+                    "exists": False,
+                    "bytes": 0,
+                    "estimated_tokens": 0,
+                    "sections": []
+                }
+            ],
+            "file_count": 1,
+            "total_bytes": 0,
+            "total_tokens": 0
+        }
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        try:
+            sys.stdout = buf
+            render_sections_report(section_payload)
+        finally:
+            sys.stdout = old_stdout
+        out = buf.getvalue()
+        self.assertIn("/tmp/fake_doc.md", out)
+        self.assertNotIn("\x1b[2J", out)
+
+        # Test render_mcp_report with malicious error
+        mcp_payload = {
+            "configs": [
+                {
+                    "path": malicious_path,
+                    "error": malicious_error,
+                    "format": "mcpServers",
+                    "servers": [],
+                    "total_servers": 0
+                }
+            ],
+            "config_count": 1,
+            "total_servers": 0,
+            "total_bytes": 0,
+            "total_tokens": 0
+        }
+        buf = io.StringIO()
+        try:
+            sys.stdout = buf
+            render_mcp_report(mcp_payload)
+        finally:
+            sys.stdout = old_stdout
+        out_mcp = buf.getvalue()
+        self.assertIn("/tmp/fake_doc.md", out_mcp)
+        self.assertIn("SyntaxError: boom", out_mcp)
+        self.assertNotIn("\x1b[2J", out_mcp)
+        self.assertNotIn("\a", out_mcp)
+
 
 if __name__ == "__main__":
     unittest.main()

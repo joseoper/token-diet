@@ -227,16 +227,18 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
         }
 
     # Ensure hooks directory is contained within the repository or git directory
-    repo_abs = os.path.abspath(repo_dir)
+    repo_real = os.path.realpath(os.path.abspath(repo_dir))
     git_dir = resolve_git_dir(repo_dir)
+    git_real = os.path.realpath(git_dir) if git_dir else None
     common_dir = resolve_common_dir(git_dir) if git_dir else None
+    common_real = os.path.realpath(common_dir) if common_dir else None
 
-    hooks_abs = os.path.abspath(hooks_dir)
+    hooks_real = os.path.realpath(os.path.abspath(hooks_dir))
     is_contained = (
-        hooks_abs == repo_abs
-        or hooks_abs.startswith(repo_abs + os.sep)
-        or (git_dir and (hooks_abs == git_dir or hooks_abs.startswith(git_dir + os.sep)))
-        or (common_dir and (hooks_abs == common_dir or hooks_abs.startswith(common_dir + os.sep)))
+        hooks_real == repo_real
+        or hooks_real.startswith(repo_real + os.sep)
+        or (git_real and (hooks_real == git_real or hooks_real.startswith(git_real + os.sep)))
+        or (common_real and (hooks_real == common_real or hooks_real.startswith(common_real + os.sep)))
     )
     if not is_contained:
         return {
@@ -245,7 +247,7 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "backup_path": None,
             "disabled_count": 0,
             "error": "Hooks directory outside repository boundary",
-            "message": f"Refusing to modify hooks outside repository boundary: {hooks_abs}",
+            "message": f"Refusing to modify hooks outside repository boundary: {hooks_real}",
         }
 
     hook_path = os.path.join(hooks_dir, "pre-commit")
@@ -279,6 +281,17 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 "disabled_count": 0,
                 "error": "Not a regular file",
                 "message": f"Pre-commit hook is not a regular file: {hook_path}",
+            }
+
+        MAX_SAFE_BYTES = 10 * 1024 * 1024  # 10 MB
+        if orig_stat.st_size > MAX_SAFE_BYTES:
+            return {
+                "fixed": False,
+                "hook_path": hook_path,
+                "backup_path": None,
+                "disabled_count": 0,
+                "error": "File exceeds maximum size limit",
+                "message": f"Pre-commit hook exceeds 10MB limit ({orig_stat.st_size} bytes): {hook_path}",
             }
 
         with open(hook_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -552,7 +565,7 @@ def main():
     print("-" * 80)
 
     for r in results:
-        status_path = r["path"]
+        status_path = sanitize_text(r["path"])
         if len(status_path) > 44:
             status_path = "..." + status_path[-41:]
 
@@ -579,8 +592,11 @@ def main():
     if hook_alerts:
         print("\n" + red(bold("🚨 IRREGULAR HOOK DETECTED:")))
         for h in hook_alerts:
-            print(red(f"  • [{h['hook']}] {h['message']}"))
-            print(f"    Path: {h['path']}")
+            h_hook = sanitize_text(str(h.get("hook", "")))
+            h_msg = sanitize_text(str(h.get("message", "")))
+            h_path = sanitize_text(str(h.get("path", "")))
+            print(red(f"  • [{h_hook}] {h_msg}"))
+            print(f"    Path: {h_path}")
         print(colorize("  💡 Tip: Run 'token-diet --fix-hooks' to automatically neutralize silent AI invocations.", "96"))
 
     # Print Recommendations if bloated
@@ -645,10 +661,11 @@ def render_sections_report(report: Dict[str, Any]) -> None:
         return
 
     for entry in report["files"]:
+        entry_path = sanitize_text(entry["path"])
         if not entry["exists"]:
-            print(colorize(f"{entry['path']}: (missing)", "90"))
+            print(colorize(f"{entry_path}: (missing)", "90"))
             continue
-        print(bold(f"{entry['path']}  ({entry['bytes']:,d} B / ~{entry['estimated_tokens']:,d} tokens)"))
+        print(bold(f"{entry_path}  ({entry['bytes']:,d} B / ~{entry['estimated_tokens']:,d} tokens)"))
         print(f'{"Line":>6} | {"Heading":<40} | {"Bytes":>9} | {"Tokens":>9} | {"Status":>8}')
         print("-" * 80)
         for section in entry["sections"]:
@@ -677,10 +694,13 @@ def render_mcp_report(report: Dict[str, Any]) -> None:
         return
 
     for config in report["configs"]:
+        config_path = sanitize_text(config["path"])
         if config.get("error"):
-            print(red(f"{config['path']}: unreadable ({config['error']})"))
+            config_err = sanitize_text(str(config["error"]))
+            print(red(f"{config_path}: unreadable ({config_err})"))
             continue
-        print(bold(f"{config['path']}  [{config['format']}]  ({config['total_servers']} server(s))"))
+        config_fmt = sanitize_text(str(config["format"]))
+        print(bold(f"{config_path}  [{config_fmt}]  ({config['total_servers']} server(s))"))
         if not config["servers"]:
             print(colorize("  No MCP servers declared.", "90"))
             continue
