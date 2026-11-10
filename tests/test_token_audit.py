@@ -5,7 +5,7 @@ import io
 import json
 import tempfile
 import contextlib
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 # Ensure src is in sys.path
 src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -182,9 +182,10 @@ class TestTokenAudit(unittest.TestCase):
             with open(hook_file, "w") as f:
                 f.write("#!/bin/sh\npytest tests/\n")
 
-            res = fix_git_hooks(tmp_dir)
+            res = fix_git_hooks(tmp_dir, interactive=False)
             self.assertFalse(res["fixed"])
             self.assertEqual(res["disabled_count"], 0)
+            self.assertEqual(res["modified_lines"], 0)
             self.assertFalse(os.path.exists(hook_file + ".bak"))
 
     def test_fix_git_hooks_success(self):
@@ -209,9 +210,10 @@ class TestTokenAudit(unittest.TestCase):
             self.assertEqual(len(alerts), 1)
 
             # Apply fix
-            res = fix_git_hooks(tmp_dir)
+            res = fix_git_hooks(tmp_dir, interactive=False)
             self.assertTrue(res["fixed"])
             self.assertEqual(res["disabled_count"], 2)
+            self.assertEqual(res["modified_lines"], 2)
             self.assertTrue(os.path.exists(res["backup_path"]))
 
             # Verify backup content equals original content
@@ -230,8 +232,78 @@ class TestTokenAudit(unittest.TestCase):
             self.assertEqual(len(alerts_after), 0)
 
             # Re-running fix should be a no-op
-            res_repeat = fix_git_hooks(tmp_dir)
+            res_repeat = fix_git_hooks(tmp_dir, interactive=False)
             self.assertFalse(res_repeat["fixed"])
+
+    def test_fix_git_hooks_compound_line_preserves_neighbour_commands(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            hooks_dir = os.path.join(tmp_dir, ".git", "hooks")
+            os.makedirs(hooks_dir)
+            hook_file = os.path.join(hooks_dir, "pre-commit")
+            with open(hook_file, "w") as f:
+                f.write("#!/bin/sh\nnpm test && claude review\nmake check ; gga audit\n")
+
+            res = fix_git_hooks(tmp_dir, interactive=False)
+            self.assertTrue(res["fixed"])
+            self.assertEqual(res["disabled_count"], 2)
+            self.assertEqual(res["modified_lines"], 2)
+
+            with open(hook_file, "r") as f:
+                content = f.read()
+            self.assertIn("npm test && true  # [token-diet disabled: claude review]", content)
+            self.assertIn("make check ; true  # [token-diet disabled: gga audit]", content)
+            self.assertNotIn("\nnpm test && claude review", content)
+            self.assertEqual(audit_git_hooks(tmp_dir), [])
+
+    def test_fix_git_hooks_dry_run_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            hooks_dir = os.path.join(tmp_dir, ".git", "hooks")
+            os.makedirs(hooks_dir)
+            hook_file = os.path.join(hooks_dir, "pre-commit")
+            original_content = "#!/bin/sh\nnpm test && claude review\n"
+            with open(hook_file, "w") as f:
+                f.write(original_content)
+            os.chmod(hook_file, 0o755)
+
+            res = fix_git_hooks(tmp_dir, dry_run=True)
+
+            self.assertTrue(res["dry_run"])
+            self.assertFalse(res["fixed"])
+            self.assertEqual(res["disabled_count"], 1)
+            self.assertEqual(res["modified_lines"], 1)
+            self.assertIn("-npm test && claude review", res["diff"])
+            self.assertIn("+npm test && true  # [token-diet disabled: claude review]", res["diff"])
+            self.assertIsNone(res["backup_path"])
+
+            # Nothing reached the disk: no rewrite, no backup.
+            self.assertFalse(os.path.exists(hook_file + ".bak"))
+            with open(hook_file, "r") as f:
+                self.assertEqual(f.read(), original_content)
+            self.assertEqual(os.stat(hook_file).st_mode & 0o777, 0o755)
+
+    def test_fix_git_hooks_interactive_decline_keeps_hook(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            hooks_dir = os.path.join(tmp_dir, ".git", "hooks")
+            os.makedirs(hooks_dir)
+            hook_file = os.path.join(hooks_dir, "pre-commit")
+            original_content = "#!/bin/sh\nclaude review\n"
+            with open(hook_file, "w") as f:
+                f.write(original_content)
+
+            fake_stdin = MagicMock()
+            fake_stdin.isatty.return_value = True
+            fake_stdin.readline.return_value = "n\n"
+
+            err = io.StringIO()
+            with patch.object(sys, "stdin", fake_stdin), contextlib.redirect_stderr(err):
+                res = fix_git_hooks(tmp_dir, interactive=True)
+
+            self.assertIn("[y/N]", err.getvalue())
+            self.assertFalse(res["fixed"])
+            self.assertTrue(res["aborted"])
+            self.assertFalse(os.path.exists(hook_file + ".bak"))
+            with open(hook_file, "r") as f:
+                self.assertEqual(f.read(), original_content)
 
 
 class TestCliFlags(unittest.TestCase):
@@ -356,7 +428,7 @@ class TestCliFlags(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(len(json.loads(out)["hook_alerts"]), 1)
 
-            code, out, _ = self._run(["--fix-hooks", "--json"], cwd=tmp)
+            code, out, _ = self._run(["--fix-hooks", "--json", "--yes"], cwd=tmp)
             self.assertEqual(code, 0)
             fixed = json.loads(out)["fix_hooks"]
             self.assertTrue(fixed["fixed"])
@@ -418,6 +490,107 @@ class TestCliFlags(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("Token budget gate active", err)
 
+    def _write_hook(self, tmp, content):
+        """Creates a pre-commit hook plus a local prompt so the CLI has targets."""
+        hooks_dir = os.path.join(tmp, ".git", "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        hook = os.path.join(hooks_dir, "pre-commit")
+        with open(hook, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.chmod(hook, 0o755)
+        with open(os.path.join(tmp, "AGENTS.md"), "w", encoding="utf-8") as f:
+            f.write("# local\n")
+        return hook
+
+    def test_fix_hooks_dry_run_reports_diff_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            content = "#!/bin/sh\nnpm test && claude review\ngga run\n"
+            hook = self._write_hook(tmp, content)
+
+            code, out, _ = self._run(["--fix-hooks", "--dry-run", "--json"], cwd=tmp)
+            self.assertEqual(code, 0)
+            result = json.loads(out)["fix_hooks"]
+            self.assertTrue(result["dry_run"])
+            self.assertFalse(result["fixed"])
+            self.assertEqual(result["disabled_count"], 2)
+            self.assertEqual(result["modified_lines"], 2)
+            self.assertIn("--- a/pre-commit", result["diff"])
+            self.assertIn("+++ b/pre-commit", result["diff"])
+            self.assertIn("-npm test && claude review", result["diff"])
+            self.assertIn("+npm test && true  # [token-diet disabled: claude review]", result["diff"])
+
+            # Nothing touched the disk and no backup was created.
+            self.assertFalse(os.path.exists(hook + ".bak"))
+            with open(hook, "r", encoding="utf-8") as f:
+                self.assertEqual(f.read(), content)
+
+    def test_fix_hooks_dry_run_renders_unified_diff_in_terminal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hook = self._write_hook(tmp, "#!/bin/sh\nclaude review\n")
+
+            code, out, _ = self._run(["--fix-hooks", "--dry-run"], cwd=tmp)
+            self.assertEqual(code, 0)
+            self.assertIn("DRY RUN", out)
+            self.assertIn("--- a/pre-commit", out)
+            self.assertIn("+++ b/pre-commit", out)
+            self.assertIn("@@", out)
+            self.assertIn("-claude review", out)
+            self.assertIn("+# [token-diet disabled]: claude review", out)
+            self.assertFalse(os.path.exists(hook + ".bak"))
+
+    def test_fix_hooks_yes_never_prompts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hook = self._write_hook(tmp, "#!/bin/sh\nclaude review\n")
+            fake_stdin = MagicMock()
+            fake_stdin.isatty.return_value = True
+            fake_stdin.readline.side_effect = AssertionError("--yes must not prompt")
+
+            with patch.object(sys, "stdin", fake_stdin):
+                code, out, err = self._run(["--fix-hooks", "--yes", "--json"], cwd=tmp)
+
+            self.assertEqual(code, 0)
+            self.assertTrue(json.loads(out)["fix_hooks"]["fixed"])
+            self.assertTrue(os.path.exists(hook + ".bak"))
+            self.assertNotIn("[y/N]", err)
+
+    def test_fix_hooks_prompts_and_aborts_on_decline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            content = "#!/bin/sh\nclaude review\n"
+            hook = self._write_hook(tmp, content)
+            fake_stdin = MagicMock()
+            fake_stdin.isatty.return_value = True
+            fake_stdin.readline.return_value = "\n"
+
+            with patch.object(sys, "stdin", fake_stdin):
+                code, out, err = self._run(["--fix-hooks", "--json"], cwd=tmp)
+
+            self.assertEqual(code, 0)
+            self.assertIn("[y/N]", err)
+            self.assertTrue(json.loads(out)["fix_hooks"]["aborted"])
+            self.assertFalse(os.path.exists(hook + ".bak"))
+            with open(hook, "r", encoding="utf-8") as f:
+                self.assertEqual(f.read(), content)
+
+    def test_dry_run_without_fix_hooks_is_a_usage_error(self):
+        code, _, err = self._run(["--dry-run"])
+        self.assertEqual(code, 2)
+        self.assertIn("--fix-hooks", err)
+
+    def test_cli_fix_hooks_rewrites_compound_hook_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hook = self._write_hook(tmp, "#!/bin/sh\nnpm test && claude review\n")
+
+            code, out, _ = self._run(["--fix-hooks", "--yes", "--json"], cwd=tmp)
+            self.assertEqual(code, 0)
+            result = json.loads(out)["fix_hooks"]
+            self.assertTrue(result["fixed"])
+            self.assertEqual(result["disabled_count"], 1)
+
+            with open(hook, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("npm test && true", content)
+            self.assertIn("# [token-diet disabled: claude review]", content)
+
     def test_cli_audits_modular_rules_individually(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             cursor_dir = os.path.join(tmp_dir, ".cursor", "rules")
@@ -438,9 +611,9 @@ class TestCliFlags(unittest.TestCase):
             payload = json.loads(out)
             self.assertEqual(payload["summary"]["files_found"], 2)
 
-            details_paths = [d["path"] for d in payload["details"]]
-            self.assertIn(rule_mdc, details_paths)
-            self.assertIn(copilot_file, details_paths)
+            details_paths = [os.path.realpath(d["path"]) for d in payload["details"]]
+            self.assertIn(os.path.realpath(rule_mdc), details_paths)
+            self.assertIn(os.path.realpath(copilot_file), details_paths)
 
             for d in payload["details"]:
                 self.assertTrue(d["exists"])

@@ -100,11 +100,11 @@ A common misconception among developers using modern LLM APIs is:
 This is technically inaccurate for two critical reasons:
 
 #### 1. How Prefix Caching Actually Operates
-Prefix caching matches tokens strictly sequentially from **token index 0**:
-* **Anthropic:** Caches sequential prefix blocks of at least 1,024 tokens.
+Prefix cache eligibility is determined strictly by prefix immutability and meeting minimum length thresholds (e.g., 1,024 tokens for Anthropic Claude Sonnet/Opus and OpenAI), not by keeping files below an arbitrary small size ceiling. Prefix caching matches tokens sequentially from **token index 0**:
+* **Anthropic:** Caches sequential prefix blocks of at least 1,024 tokens (2,048 tokens on Haiku).
 * **OpenAI:** Automatically matches cached prefixes in 1,024-token increments starting at the top of the request.
 
-A static, long prompt **does NOT break cache by itself**. As long as the prompt is byte-for-byte identical at the beginning of the message payload, cache hits will occur. What **breaks** prefix caching is:
+A static, long prompt **does NOT fail cache eligibility by itself**. As long as the prompt is byte-for-byte identical at the beginning of the message payload, cache hits will occur regardless of file size. What **breaks** prefix caching is:
 * Prepending dynamic timestamps, dates, or volatile session UUIDs before the static block.
 * Introducing unpinned environment variables or dynamic workspace paths.
 * Modifying even a single character in the preamble.
@@ -116,9 +116,9 @@ Even when cache hits occur, monolithic prompts create severe operational bottlen
 * **Context Window Starvation:** Cache hit or miss, **cached tokens consume active context window capacity**. 8,400 tokens of static rules permanently rob the model of active attention on every turn.
 * **Reasoning Dilution ("Needle-in-a-Haystack" Failure):** Drowning the model in 25 KB of monolithic guidelines dilutes attention. Frontier models suffer retrieval and instruction-following degradation when key constraints are buried in pages of irrelevant protocols.
 
-### 2.2 Quantitative Benchmark: Monolithic vs. LUT Router
+### 2.2 Simulated 20-Turn Session Model: Monolithic Directives vs. Token Diet LUT Router
 
-An empirical comparison across a standard 20-turn agent coding session illustrates the difference between a monolithic prompt and a decoupled Look-Up Table (LUT) Router:
+Below is a simulated 20-turn session model comparing base context consumption and memory retention between a monolithic directive and a decoupled Look-Up Table (LUT) Router:
 
 ![Context Benchmark Chart](../assets/context_benchmark_chart.jpg)
 
@@ -129,7 +129,12 @@ An empirical comparison across a standard 20-turn agent coding session illustrat
 | **Boilerplate Usable Memory Share** | **~75%** of context window | **< 8%** of context window | **-67% context wasted on boilerplate** |
 | **Retained Working Memory for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% retained working memory** |
 | **Cache Miss Re-ingestion Penalty** | 8,400 tokens / miss | 750 tokens / miss | **-91% penalty exposure** |
-| **Reasoning Fidelity & Attention Focus** | High risk of instruction dilution | Laser-focused on current task | **Maximized attention accuracy** |
+| **Reasoning Fidelity & Attention Focus** | High risk of instruction dilution | Laser-focused on current task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
+
+> [!NOTE] **Methodological Framework & Model Parameters**
+> - **Token Estimation Heuristic:** Based on the standard `cl100k_base` heuristic (~4 characters/bytes per token for structured Markdown/prose).
+> - **Session Dynamics:** Models a standard 20-turn active coding workflow where the monolithic directive (~8,400 tokens) is re-ingested into context on every turn versus the LUT Router (base ~750 tokens + ~1,200 tokens during turns where specialized domain skills are loaded on demand).
+> - **Reference Context Window:** Calibrated against standard active context windows (e.g., 128k/200k tokens), demonstrating how the LUT Router frees working memory for code context and compiler diagnostics rather than static boilerplate.
 
 *In a monolithic setup, ~75% of your conversational memory is permanently consumed by idle instructions that are never executed in the session. Token Diet's LUT Router preserves > 92% of working memory for actual code, AST analysis, and compiler feedback.*
 

@@ -26,11 +26,13 @@ from token_diet.baseline import (
 )
 from token_diet.git_hooks import (
     AI_HOOK_KEYWORDS,
+    find_ai_invocations,
     has_ai_invocation,
     read_core_hooks_path,
     resolve_common_dir,
     resolve_git_dir,
     resolve_hooks_dir,
+    rewrite_line_neutralizing_ai,
 )
 from token_diet.mcp_audit import (
     MCP_CONFIG_CANDIDATES,
@@ -44,7 +46,7 @@ from token_diet.sections import (
     split_sections,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     "estimate_tokens",
     "audit_file",
@@ -62,6 +64,8 @@ __all__ = [
     "THRESHOLD_ALERT_BYTES",
     "AI_HOOK_KEYWORDS",
     "has_ai_invocation",
+    "find_ai_invocations",
+    "rewrite_line_neutralizing_ai",
     "read_core_hooks_path",
     "resolve_common_dir",
     "resolve_git_dir",

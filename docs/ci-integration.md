@@ -117,7 +117,7 @@ Generate structured telemetry reports inside PR reviews using the `--json` flag:
 |---|:---:|---|
 | **Root Directives (`AGENTS.md`)** | `1,000 tokens` (< 4 KB) | Leaves 99%+ of the context window free for source code and tools. |
 | **Project Documentation Folder (`docs/`)** | `5,000 tokens` (< 20 KB) | Prevents documentation trees from exceeding default retrieval limits. |
-| **Total Turn Ingestion Budget** | `2,500 tokens` (< 10 KB) | Preserves maximum prompt cache hit rate and minimizes per-turn toll. |
+| **Total Turn Ingestion Budget** | `2,500 tokens` (< 10 KB) | Minimizes exposure to full-price cache-miss penalties upon TTL expiration and keeps turn ingestion lean. |
 
 ---
 

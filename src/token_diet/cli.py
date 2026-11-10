@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import argparse
+import difflib
 import math
 import re
 import stat
@@ -29,6 +30,7 @@ from .git_hooks import (
     resolve_common_dir,
     resolve_git_dir,
     resolve_hooks_dir,
+    rewrite_line_neutralizing_ai,
 )
 from .mcp_audit import audit_mcp_overhead
 from .sections import audit_sections_for_paths
@@ -210,12 +212,46 @@ def audit_git_hooks(repo_dir: str = ".") -> List[Dict[str, Any]]:
     return alerts
 
 
-def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
+def build_hook_diff(hook_path: str, original: List[str], updated: List[str]) -> str:
+    """Builds a unified diff between the current and the neutralized hook content."""
+    name = os.path.basename(hook_path)
+    return "".join(
+        difflib.unified_diff(original, updated, fromfile=f"a/{name}", tofile=f"b/{name}", n=3)
+    )
+
+
+def format_unified_diff(diff_text: str) -> str:
+    """Applies ANSI colors to a unified diff for terminal display."""
+    rendered: List[str] = []
+    for line in diff_text.splitlines():
+        if line.startswith("+++") or line.startswith("---"):
+            rendered.append(bold(line))
+        elif line.startswith("@@"):
+            rendered.append(colorize(line, "96"))
+        elif line.startswith("+"):
+            rendered.append(green(line))
+        elif line.startswith("-"):
+            rendered.append(red(line))
+        else:
+            rendered.append(line)
+    return "\n".join(rendered)
+
+
+def fix_git_hooks(
+    repo_dir: str = ".",
+    dry_run: bool = False,
+    interactive: bool = False,
+) -> Dict[str, Any]:
     """
     Safely neutralizes unmonitored AI/LLM invocations in the active pre-commit hook:
-    1. Creates a backup copy at <hook>.bak.
-    2. Comments out lines that invoke matched AI review keywords.
+    1. Rewrites only the offending subcommand of each line, preserving shell syntax.
+    2. Creates a backup copy at <hook>.bak.
     3. Preserves original executable file permissions.
+
+    With ``dry_run=True`` nothing is written: the unified diff, the number of
+    modified lines and the number of neutralized invocations are returned.
+    With ``interactive=True`` (and a TTY, and not a dry run) the diff is shown
+    and the user must confirm before the hook is modified.
     """
     hooks_dir = resolve_hooks_dir(repo_dir)
     if hooks_dir is None:
@@ -224,6 +260,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "hook_path": None,
             "backup_path": None,
             "disabled_count": 0,
+            "modified_lines": 0,
+            "diff": "",
             "message": "No Git hooks directory detected for this repository.",
         }
 
@@ -247,6 +285,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "hook_path": os.path.join(hooks_dir, "pre-commit"),
             "backup_path": None,
             "disabled_count": 0,
+            "modified_lines": 0,
+            "diff": "",
             "error": "Hooks directory outside repository boundary",
             "message": f"Refusing to modify hooks outside repository boundary: {hooks_real}",
         }
@@ -258,6 +298,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "hook_path": hook_path,
             "backup_path": None,
             "disabled_count": 0,
+            "modified_lines": 0,
+            "diff": "",
             "error": "Refusing to modify hook through symlink",
             "message": f"Pre-commit hook is a symlink: {hook_path}. Refusing to modify target through symlink.",
         }
@@ -268,6 +310,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "hook_path": hook_path,
             "backup_path": None,
             "disabled_count": 0,
+            "modified_lines": 0,
+            "diff": "",
             "message": "No pre-commit hook found in the active hooks directory.",
         }
 
@@ -280,6 +324,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 "hook_path": hook_path,
                 "backup_path": None,
                 "disabled_count": 0,
+                "modified_lines": 0,
+                "diff": "",
                 "error": "Not a regular file",
                 "message": f"Pre-commit hook is not a regular file: {hook_path}",
             }
@@ -291,6 +337,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 "hook_path": hook_path,
                 "backup_path": None,
                 "disabled_count": 0,
+                "modified_lines": 0,
+                "diff": "",
                 "error": "File exceeds maximum size limit",
                 "message": f"Pre-commit hook exceeds 10MB limit ({orig_stat.st_size} bytes): {hook_path}",
             }
@@ -298,20 +346,25 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
         with open(hook_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
 
-        modified_lines = []
+        updated_lines = []
         disabled_count = 0
+        changed_line_count = 0
         for line in lines:
             stripped = line.strip()
             # Preserve already-commented lines
             if stripped.startswith("#"):
-                modified_lines.append(line)
+                updated_lines.append(line)
                 continue
 
-            if has_ai_invocation(line):
-                modified_lines.append(f"# [token-diet disabled]: {line}")
-                disabled_count += 1
+            rewritten, neutralized = rewrite_line_neutralizing_ai(line)
+            if neutralized:
+                updated_lines.append(rewritten)
+                disabled_count += neutralized
+                changed_line_count += 1
             else:
-                modified_lines.append(line)
+                updated_lines.append(line)
+
+        diff_text = build_hook_diff(hook_path, lines, updated_lines)
 
         if disabled_count == 0:
             return {
@@ -319,8 +372,49 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 "hook_path": hook_path,
                 "backup_path": None,
                 "disabled_count": 0,
+                "modified_lines": 0,
+                "diff": "",
+                "dry_run": dry_run,
                 "message": f"No irregular AI hooks detected to disable in {hook_path}",
             }
+
+        if dry_run:
+            return {
+                "fixed": False,
+                "dry_run": True,
+                "hook_path": hook_path,
+                "backup_path": None,
+                "disabled_count": disabled_count,
+                "modified_lines": changed_line_count,
+                "diff": diff_text,
+                "message": (
+                    f"Dry run: {disabled_count} AI invocation(s) across "
+                    f"{changed_line_count} line(s) would be neutralized in {hook_path}. "
+                    "No files were modified."
+                ),
+            }
+
+        if interactive and sys.stdin.isatty():
+            print(bold("🔍 PRE-COMMIT HOOK NEUTRALIZATION PREVIEW"), file=sys.stderr)
+            print(format_unified_diff(diff_text), file=sys.stderr)
+            sys.stderr.write(f"Apply these changes to {hook_path}? [y/N] ")
+            sys.stderr.flush()
+            answer = ""
+            try:
+                answer = sys.stdin.readline()
+            except (EOFError, KeyboardInterrupt):
+                answer = ""
+            if answer.strip().lower() not in ("y", "yes"):
+                return {
+                    "fixed": False,
+                    "hook_path": hook_path,
+                    "backup_path": None,
+                    "disabled_count": 0,
+                    "modified_lines": 0,
+                    "diff": diff_text,
+                    "aborted": True,
+                    "message": "Aborted by user. No files were modified.",
+                }
 
         backup_path = hook_path + ".bak"
         if os.path.islink(backup_path):
@@ -329,6 +423,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                 "hook_path": hook_path,
                 "backup_path": None,
                 "disabled_count": 0,
+                "modified_lines": 0,
+                "diff": "",
                 "error": "Symlink detected at backup path",
                 "message": f"Backup target is a symlink: {backup_path}. Refusing to write backup.",
             }
@@ -342,7 +438,7 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
         # Atomic replacement for hook_path
         hooks_dir = os.path.dirname(hook_path)
         with tempfile.NamedTemporaryFile("w", dir=hooks_dir, delete=False, encoding="utf-8") as tmp:
-            tmp.writelines(modified_lines)
+            tmp.writelines(updated_lines)
             temp_name = tmp.name
 
         try:
@@ -356,6 +452,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
                     "hook_path": hook_path,
                     "backup_path": backup_path,
                     "disabled_count": 0,
+                    "modified_lines": 0,
+                    "diff": "",
                     "error": "TOCTOU race detected",
                     "message": "File status changed during remediation; aborting replacement.",
                 }
@@ -370,6 +468,9 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "hook_path": hook_path,
             "backup_path": backup_path,
             "disabled_count": disabled_count,
+            "modified_lines": changed_line_count,
+            "diff": diff_text,
+            "dry_run": False,
             "message": f"Successfully neutralized {disabled_count} AI invocation(s). Backup saved to {backup_path}",
         }
     except Exception as e:
@@ -378,6 +479,8 @@ def fix_git_hooks(repo_dir: str = ".") -> Dict[str, Any]:
             "hook_path": hook_path,
             "backup_path": None,
             "disabled_count": 0,
+            "modified_lines": 0,
+            "diff": "",
             "error": str(e),
             "message": f"Failed to fix pre-commit hook: {e}",
         }
@@ -473,7 +576,18 @@ def main():
     parser.add_argument(
         "--fix-hooks",
         action="store_true",
-        help="Automatically neutralize unmonitored AI review invocations in the active pre-commit hook (worktree and core.hooksPath aware; creates a .bak backup).",
+        help="Automatically neutralize unmonitored AI review invocations in the active pre-commit hook (worktree and core.hooksPath aware; rewrites only the offending subcommand; creates a .bak backup).",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="With --fix-hooks: preview the hook rewrite as a colored unified diff without touching any file or backup.",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Assume 'yes' for interactive confirmations (non-interactive mode for scripts and CI).",
     )
     parser.add_argument(
         "--sections",
@@ -502,18 +616,28 @@ def main():
     if args.max_delta is not None and args.baseline is None:
         parser.error("--max-delta requires --baseline <file.json>")
 
+    if args.dry_run and not args.fix_hooks:
+        parser.error("--dry-run requires --fix-hooks")
+
     if args.fix_hooks:
-        fix_result = fix_git_hooks(".")
+        fix_result = fix_git_hooks(".", dry_run=args.dry_run, interactive=not args.yes)
         if args.json:
             print(json.dumps({"fix_hooks": fix_result}, indent=2))
+        elif fix_result.get("dry_run"):
+            print(bold("🔍 DRY RUN: PRE-COMMIT HOOK NEUTRALIZATION PREVIEW"))
+            diff_text = fix_result.get("diff") or ""
+            if diff_text:
+                print(format_unified_diff(diff_text))
+            print(yellow(f"ℹ️  {fix_result['message']}"))
+        elif fix_result.get("aborted"):
+            print(yellow(f"ℹ️  {fix_result['message']}"))
+        elif fix_result["fixed"]:
+            print(green(bold("🛠️  AUTO-REMEDIATION: PRE-COMMIT HOOKS NEUTRALIZED")))
+            print(f"  • Backup saved: {fix_result['backup_path']}")
+            print(f"  • Neutralized {fix_result['disabled_count']} AI review invocation(s) across {fix_result['modified_lines']} line(s).")
+            print("  • Safe pre-commit hook is active without silent token bleed.")
         else:
-            if fix_result["fixed"]:
-                print(green(bold("🛠️  AUTO-REMEDIATION: PRE-COMMIT HOOKS NEUTRALIZED")))
-                print(f"  • Backup saved: {fix_result['backup_path']}")
-                print(f"  • Neutralized {fix_result['disabled_count']} AI review invocation(s).")
-                print("  • Safe pre-commit hook is active without silent token bleed.")
-            else:
-                print(yellow(f"ℹ️  {fix_result['message']}"))
+            print(yellow(f"ℹ️  {fix_result['message']}"))
         return
 
     check_local = not args.global_only

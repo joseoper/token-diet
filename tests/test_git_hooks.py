@@ -11,11 +11,13 @@ if src_path not in sys.path:
 
 from token_diet.git_hooks import (
     AI_HOOK_KEYWORDS,
+    find_ai_invocations,
     has_ai_invocation,
     read_core_hooks_path,
     resolve_common_dir,
     resolve_git_dir,
     resolve_hooks_dir,
+    rewrite_line_neutralizing_ai,
 )
 
 
@@ -300,6 +302,137 @@ class TestGitHooks(unittest.TestCase):
 
         # Subcommand invocation with operators
         self.assertEqual(has_ai_invocation("npm test && claude review"), ["claude"])
+
+        # Quoted arguments are not invocations
+        self.assertEqual(has_ai_invocation('git commit -m "chore: claude review"'), [])
+        self.assertEqual(has_ai_invocation('echo "npm && claude review"'), [])
+
+
+class TestFindAiInvocations(unittest.TestCase):
+    """Positional spans are what allows surgical, syntax-safe neutralization."""
+
+    def test_reports_only_the_offending_subcommand_span(self):
+        line = "npm test && claude review\n"
+        invocations = find_ai_invocations(line)
+        self.assertEqual(len(invocations), 1)
+        start, end, keywords = invocations[0]
+        self.assertEqual(line[start:end].strip(), "claude review")
+        self.assertIn("claude", keywords)
+
+    def test_semicolon_and_or_spans(self):
+        semicolon = find_ai_invocations("make check ; gga audit\n")
+        self.assertEqual(len(semicolon), 1)
+        self.assertEqual("make check ; gga audit\n"[semicolon[0][0]:semicolon[0][1]].strip(), "gga audit")
+
+        fallback = find_ai_invocations("claude review || exit 1\n")
+        self.assertEqual(len(fallback), 1)
+        self.assertEqual("claude review || exit 1\n"[fallback[0][0]:fallback[0][1]].strip(), "claude review")
+
+    def test_subshell_span_excludes_delimiters(self):
+        line = "echo $(claude review)\n"
+        invocations = find_ai_invocations(line)
+        self.assertEqual(len(invocations), 1)
+        self.assertEqual(line[invocations[0][0]:invocations[0][1]].strip(), "claude review")
+
+    def test_no_spans_for_clean_lines(self):
+        self.assertEqual(find_ai_invocations("ruff check .\n"), [])
+        self.assertEqual(find_ai_invocations("#!/bin/sh\n"), [])
+        self.assertEqual(find_ai_invocations(""), [])
+
+
+class TestRewriteLineNeutralizingAI(unittest.TestCase):
+    """Neutralization must keep the surrounding shell syntax executable."""
+
+    def test_and_operator_preserves_preceding_command(self):
+        line, count = rewrite_line_neutralizing_ai("npm test && claude review\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "npm test && true  # [token-diet disabled: claude review]\n")
+        self.assertEqual(has_ai_invocation(line), [])
+
+    def test_semicolon_separated_commands(self):
+        line, count = rewrite_line_neutralizing_ai("make check ; gga audit\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "make check ; true  # [token-diet disabled: gga audit]\n")
+        self.assertEqual(has_ai_invocation(line), [])
+
+    def test_or_operator_keeps_fallback_branch(self):
+        line, count = rewrite_line_neutralizing_ai("claude review || exit 1\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "true || exit 1  # [token-diet disabled: claude review]\n")
+
+    def test_command_substitution_keeps_closing_paren(self):
+        line, count = rewrite_line_neutralizing_ai("echo $(claude review)\n")
+        self.assertEqual(count, 1)
+        self.assertIn("$(true)", line)
+        self.assertIn(")", line)
+        # A trailing comment must never swallow the closing paren of the substitution.
+        self.assertNotIn("$(true #", line)
+
+    def test_subshell_keeps_delimiters(self):
+        line, count = rewrite_line_neutralizing_ai("ruff check . && (claude review)\n")
+        self.assertEqual(count, 1)
+        self.assertIn("ruff check . && (true)", line)
+
+    def test_pipeline_preserves_neighbouring_stages(self):
+        line, count = rewrite_line_neutralizing_ai("gga audit | tee report.log\n")
+        self.assertEqual(count, 1)
+        self.assertIn("true | tee report.log", line)
+
+    def test_line_that_is_only_ai_invocation_is_commented(self):
+        line, count = rewrite_line_neutralizing_ai("gga run --provider opencode\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "# [token-diet disabled]: gga run --provider opencode\n")
+        self.assertEqual(has_ai_invocation(line), [])
+
+    def test_multiple_invocations_on_one_line(self):
+        line, count = rewrite_line_neutralizing_ai("gga run && claude review\n")
+        self.assertEqual(count, 2)
+        self.assertIn("true && true", line)
+        self.assertIn("gga run; claude review", line)
+
+    def test_shell_control_keywords_are_preserved(self):
+        line, count = rewrite_line_neutralizing_ai("if [ -f x ]; then claude review; fi\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(
+            line, "if [ -f x ]; then true; fi  # [token-diet disabled: claude review]\n"
+        )
+
+    def test_path_qualified_binary_keeps_its_path(self):
+        line, count = rewrite_line_neutralizing_ai("/usr/bin/claude review --all\n")
+        self.assertEqual(count, 1)
+        self.assertIn("/usr/bin/true", line)
+
+    def test_line_continuation_avoids_trailing_comment(self):
+        line, count = rewrite_line_neutralizing_ai("npm test && claude review \\\n")
+        self.assertEqual(count, 1)
+        self.assertIn("npm test && true", line)
+        self.assertTrue(line.rstrip("\n").endswith("\\"))
+        self.assertNotIn("# [token-diet disabled", line)
+
+    def test_non_ai_lines_are_untouched(self):
+        for case in (
+            "",
+            "\n",
+            "pytest tests/\n",
+            "# claude review\n",
+            "echo opencode.json\n",
+            "export PATH=$HOME/.claude/bin:$PATH\n",
+            "gemini_count=12\n",
+            'git commit -m "chore: claude review"\n',
+        ):
+            self.assertEqual(rewrite_line_neutralizing_ai(case), (case, 0))
+
+    def test_rewrite_is_idempotent(self):
+        once, first_count = rewrite_line_neutralizing_ai("npm test && claude review\n")
+        twice, second_count = rewrite_line_neutralizing_ai(once)
+        self.assertEqual(first_count, 1)
+        self.assertEqual(second_count, 0)
+        self.assertEqual(twice, once)
+
+    def test_preserves_crlf_line_endings(self):
+        line, count = rewrite_line_neutralizing_ai("npm test && claude review\r\n")
+        self.assertEqual(count, 1)
+        self.assertTrue(line.endswith("\r\n"))
 
 
 if __name__ == "__main__":

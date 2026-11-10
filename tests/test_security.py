@@ -15,8 +15,14 @@ import argparse
 import os
 import shutil
 import stat
+import sys
 import tempfile
 import unittest
+
+# Ensure src is in sys.path
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from token_diet.baseline import check_budget, load_baseline
 from token_diet.cli import _validate_max_delta, fix_git_hooks, sanitize_text
