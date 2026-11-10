@@ -71,7 +71,7 @@
   <g class="mono" font-size="14.5" xml:space="preserve">
     <!-- Prompt Line -->
     <text x="55" y="102">
-      <tspan class="prompt">jose@macbook</tspan><tspan class="dim">:</tspan><tspan fill="#60a5fa">~/my-ai-repo</tspan><tspan fill="#f3f4f6">$ </tspan><tspan class="cmd">token-diet</tspan>
+      <tspan class="prompt">runner@ci</tspan><tspan class="dim">:</tspan><tspan fill="#60a5fa">~/project</tspan><tspan fill="#f3f4f6">$ </tspan><tspan class="cmd">token-diet</tspan>
     </text>
 
     <!-- Header Divider -->
@@ -134,7 +134,7 @@
 
     <!-- Cursor prompt at bottom -->
     <text x="55" y="582">
-      <tspan class="prompt">jose@macbook</tspan><tspan class="dim">:</tspan><tspan fill="#60a5fa">~/my-ai-repo</tspan><tspan fill="#f3f4f6">$ </tspan><tspan fill="#60a5fa" font-weight="700">_</tspan>
+      <tspan class="prompt">runner@ci</tspan><tspan class="dim">:</tspan><tspan fill="#60a5fa">~/project</tspan><tspan fill="#f3f4f6">$ </tspan><tspan fill="#60a5fa" font-weight="700">_</tspan>
     </text>
   </g>
 </svg>
