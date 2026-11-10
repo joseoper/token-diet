@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Token Diet" width="600">
+</p>
+
 # token-diet
 
 **The Structural Context & Invisible Waste Auditor for AI Coding Agents**
@@ -390,8 +394,14 @@ token-diet/
 │   └── workflows/
 │       └── ci.yml             # Automated multi-version CI test runner
 ├── assets/
-│   ├── comparison_matrix.jpg  # Architecture comparison matrix
-│   └── context_benchmark_chart.jpg # Context footprint benchmark chart
+│   ├── comparison_matrix.jpg       # Architecture comparison matrix
+│   ├── context_benchmark_chart.jpg # Context footprint benchmark chart
+│   ├── logo.png                    # Public Open-Source banner logo (1200x400)
+│   ├── logo_icon.png               # Public Open-Source square icon (512x512)
+│   ├── logo_icon.svg               # Vector SVG icon source
+│   ├── logo_agensi.png             # Agensi Marketplace edition banner logo (1200x400)
+│   ├── logo_agensi_icon.png        # Agensi Marketplace edition square icon (512x512)
+│   └── logo_agensi_icon.svg        # Agensi vector SVG icon source
 ├── docs/
 │   ├── remediation-playbook.md # Step-by-step token containment and LUT routing
 │   └── ci-integration.md       # CI workflows & pre-commit gatekeeper examples
