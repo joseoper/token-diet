@@ -118,6 +118,8 @@ flowchart LR
 
 ## 5. Where Token Diet Fits: Structural Context vs. Runtime Gateways
 
+> *"Most token optimization tools optimize the request. Token Diet audits the architecture that creates the request."*
+
 Most LLM optimization tooling operates downstream at runtime—proxying HTTP traffic or compressing prompt text on the fly. `token-diet` addresses the upstream architectural cause: **unmanaged, bloated instruction files, declared MCP schemas, and unmetered git hooks living directly in your repository**.
 
 ![Token Diet vs Runtime Gateways and Text Compressors](assets/comparison_matrix.jpg)
@@ -144,6 +146,10 @@ Most LLM optimization tooling operates downstream at runtime—proxying HTTP tra
 ## 6. Context Savings Model & Methodology
 
 ### Technical Rigor: How Prompt Caching Really Works (and Why Bloat Still Kills)
+
+> [!IMPORTANT]
+> **Prompt Caching & Context Headroom Reality**  
+> *Smaller static context reduces context-window pressure and cache-miss exposure. However, prompt caching depends on prefix stability, provider-specific caching rules and request structure, not prompt size alone.*
 
 There is a widespread misconception regarding modern prompt caching (Anthropic prompt caching, OpenAI prefix caching):
 
@@ -184,10 +190,10 @@ Below is a simulated 20-turn session model measuring base context consumption an
 |---|:---:|:---:|:---:|
 | **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base tokens** |
 | **Cumulative Ingestion (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens spared** |
-| **Boilerplate Usable Memory Share** | **~75%** of context window | **< 8%** of context window | **-67% context wasted on boilerplate** |
-| **Retained Working Memory for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% retained working memory** |
+| **Boilerplate Context Share** | **~75%** of base context | **< 8%** of base context | **-67% static context footprint** |
+| **Active Context Headroom for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% freed working headroom** |
 | **Cache Miss Re-ingestion Penalty** | 8,400 tokens / miss | 750 tokens / miss | **-91% penalty exposure** |
-| **Reasoning Fidelity & Attention Focus** | High risk of instruction dilution | Laser-focused on current task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
+| **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
 
 > [!NOTE] **Methodological Framework & Model Parameters**
 > - **Token Estimation Heuristic:** Based on the standard `cl100k_base` / `o200k_base` estimation heuristic (~4 characters/bytes per token for structured Markdown/prose).
@@ -251,15 +257,15 @@ AGENTS.md  (23,914 B / ~5,978 tokens)
 
 Content before the first `##` heading is grouped as `(preamble)`, and deeper headings (`###`) stay attributed to their parent section. Combine with `--json` for machine-readable output.
 
-### 5. Audit MCP Server Overhead (`--mcp`)
-Every declared MCP server consumes context, and some configs inline large tool schemas. `token-diet` discovers local `opencode.json`, `.mcp.json`, `mcp.json`, `.cursor/mcp.json`, and `.vscode/mcp.json` files and reports the payload cost per server:
+### 5. Audit MCP Configuration Footprint (`--mcp`)
+Every declared MCP server adds configuration overhead, and some configs inline large tool schemas. `token-diet` discovers local `opencode.json`, `.mcp.json`, `mcp.json`, `.cursor/mcp.json`, and `.vscode/mcp.json` files and reports the estimated configuration footprint per server:
 
 ```bash
 token-diet --mcp
 ```
 
 ```text
-MCP SERVER PAYLOAD AUDIT
+ESTIMATED MCP CONFIGURATION FOOTPRINT
 ================================================================================
 opencode.json  [opencode]  (2 server(s))
 Server                         | Transport | Tools |     Bytes |    Tokens |   Status

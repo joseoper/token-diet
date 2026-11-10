@@ -94,6 +94,11 @@ The primary goal of Phase 1 is to eliminate invisible, background API calls that
 The goal of Phase 2 is to reduce static baseline context from **~8,400 base tokens per turn down to < 750 tokens**, preserving over 92% of working context memory for code and reasoning.
 
 ### 2.1 The Technical Reality of Prompt Caching & The Cost of Bloat
+
+> [!IMPORTANT]
+> **Prompt Caching & Context Headroom Reality**  
+> *Smaller static context reduces context-window pressure and cache-miss exposure. However, prompt caching depends on prefix stability, provider-specific caching rules and request structure, not prompt size alone.*
+
 A common misconception among developers using modern LLM APIs is:
 > *"Since Anthropic and OpenAI support prompt caching at up to 90% discount, large instruction files don't matter."*
 
@@ -126,10 +131,10 @@ Below is a simulated 20-turn session model comparing base context consumption an
 |---|:---:|:---:|:---:|
 | **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base tokens** |
 | **Cumulative Ingestion (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens spared** |
-| **Boilerplate Usable Memory Share** | **~75%** of context window | **< 8%** of context window | **-67% context wasted on boilerplate** |
-| **Retained Working Memory for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% retained working memory** |
+| **Boilerplate Context Share** | **~75%** of base context | **< 8%** of base context | **-67% static context footprint** |
+| **Active Context Headroom for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% freed working headroom** |
 | **Cache Miss Re-ingestion Penalty** | 8,400 tokens / miss | 750 tokens / miss | **-91% penalty exposure** |
-| **Reasoning Fidelity & Attention Focus** | High risk of instruction dilution | Laser-focused on current task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
+| **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
 
 > [!NOTE] **Methodological Framework & Model Parameters**
 > - **Token Estimation Heuristic:** Based on the standard `cl100k_base` heuristic (~4 characters/bytes per token for structured Markdown/prose).
@@ -204,7 +209,7 @@ While Phases 1–3 secure static repository directives and developer infrastruct
   - Never regenerate an entire module when modifying individual functions or variables.
 
 ### 4.3 Context Compaction & 80k–100k Token Hard Cutoffs
-* **Problem:** Long-running debugging sessions accumulate dead terminal output, stale file diffs, and obsolete stack traces. Once a thread exceeds ~80,000 tokens, response latency increases, reasoning fidelity degrades ("needle in a haystack" decay), and every prompt costs a fortune.
+* **Problem:** Long-running debugging sessions accumulate dead terminal output, stale file diffs, and obsolete stack traces. Once a thread exceeds ~80,000 tokens, response latency increases, attention recall degrades ("needle in a haystack" retrieval decay), and every prompt costs a fortune.
 * **Remediation Pattern:**
   - Establish a hard ceiling: **Compact context or start a new thread at ~80,000–100,000 tokens**.
   - **Thread Handover Protocol:** When hitting the threshold:

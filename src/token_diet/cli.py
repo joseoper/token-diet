@@ -597,7 +597,7 @@ def main():
     parser.add_argument(
         "--mcp",
         action="store_true",
-        help="Audit MCP server payload overhead from local opencode.json, .mcp.json, or mcp.json configs.",
+        help="Audit estimated MCP configuration footprint from local opencode.json, .mcp.json, or mcp.json configs.",
     )
     parser.add_argument(
         "--baseline",
@@ -810,9 +810,9 @@ def render_sections_report(report: Dict[str, Any]) -> None:
 
 
 def render_mcp_report(report: Dict[str, Any]) -> None:
-    """Prints the MCP server payload overhead breakdown."""
+    """Prints the estimated MCP configuration footprint breakdown."""
     print(bold("=" * 80))
-    print(bold("MCP SERVER PAYLOAD AUDIT"))
+    print(bold("ESTIMATED MCP CONFIGURATION FOOTPRINT"))
     print(bold("=" * 80))
     if report["config_count"] == 0:
         print(yellow("  No MCP configuration found (opencode.json, .mcp.json, mcp.json)."))
