@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0f19" />
+      <stop offset="50%" stop-color="#0d1117" />
+      <stop offset="100%" stop-color="#070a10" />
+    </linearGradient>
+
+    <!-- Window Header Gradient -->
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1c2128" />
+      <stop offset="100%" stop-color="#161b22" />
+    </linearGradient>
+
+    <!-- Alert Box Gradient -->
+    <linearGradient id="alert-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(239, 68, 68, 0.15)" />
+      <stop offset="100%" stop-color="rgba(239, 68, 68, 0.05)" />
+    </linearGradient>
+
+    <!-- Subtle Outer Glow / Shadow -->
+    <filter id="window-shadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feOffset dx="0" dy="12" result="offset" />
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.45" />
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+      .prompt { fill: #10b981; font-weight: 700; }
+      .cmd { fill: #f3f4f6; font-weight: 600; }
+      .cyan { fill: #38bdf8; font-weight: 700; }
+      .dim { fill: #6b7280; }
+      .text-light { fill: #e5e7eb; }
+      .text-white { fill: #ffffff; }
+      .text-ok { fill: #10b981; font-weight: 700; }
+      .text-warn { fill: #fbbf24; font-weight: 700; }
+      .text-alert { fill: #ef4444; font-weight: 700; }
+      .badge-ok { fill: #064e3b; }
+      .badge-warn { fill: #78350f; }
+      .badge-alert { fill: #7f1d1d; }
+    </style>
+  </defs>
+
+  <!-- Canvas Outer Margin with Window Shadow -->
+  <g filter="url(#window-shadow)">
+    <!-- Terminal Window Container -->
+    <rect x="25" y="20" width="950" height="580" rx="12" fill="url(#bg-grad)" stroke="#30363d" stroke-width="1.5" />
+
+    <!-- Terminal Window Titlebar -->
+    <path d="M 25 32 Q 25 20 37 20 L 963 20 Q 975 20 975 32 L 975 64 L 25 64 Z" fill="url(#header-grad)" />
+    <line x1="25" y1="64" x2="975" y2="64" stroke="#30363d" stroke-width="1" />
+
+    <!-- macOS Window Buttons -->
+    <circle cx="50" cy="42" r="6.5" fill="#ff5f56" stroke="#e0443e" stroke-width="0.5" />
+    <circle cx="72" cy="42" r="6.5" fill="#ffbd2e" stroke="#dea123" stroke-width="0.5" />
+    <circle cx="94" cy="42" r="6.5" fill="#27c93f" stroke="#1aab29" stroke-width="0.5" />
+
+    <!-- Window Title -->
+    <text x="500" y="46" text-anchor="middle" fill="#8b949e" font-size="13" class="mono" font-weight="500">token-diet — zsh — 980x580</text>
+  </g>
+
+  <!-- Terminal Content Area -->
+  <g class="mono" font-size="14.5" xml:space="preserve">
+    <!-- Prompt Line -->
+    <text x="55" y="102">
+      <tspan class="prompt">jose@macbook</tspan><tspan class="dim">:</tspan><tspan fill="#60a5fa">~/my-ai-repo</tspan><tspan fill="#f3f4f6">$ </tspan><tspan class="cmd">token-diet</tspan>
+    </text>
+
+    <!-- Header Divider -->
+    <text x="55" y="132" class="cyan">================================================================================</text>
+    <text x="55" y="154" class="cyan">TOKEN DIET: FOOTPRINT &amp; CONTEXT AUDIT</text>
+    <text x="55" y="176" class="cyan">================================================================================</text>
+
+    <!-- Table Header -->
+    <text x="55" y="202" fill="#9ca3af" font-weight="600">File / Directive                               |     Bytes |    Tokens |   Status</text>
+    <text x="55" y="222" class="dim">--------------------------------------------------------------------------------</text>
+
+    <!-- Row 1: AGENTS.md (OK) -->
+    <text x="55" y="248">
+      <tspan class="text-light">AGENTS.md                                      |     2,450 |       612 |     </tspan><tspan class="text-ok">[OK]</tspan>
+    </text>
+
+    <!-- Row 2: database.mdc (OK) -->
+    <text x="55" y="274">
+      <tspan class="text-light">.cursor/rules/database.mdc                     |     3,120 |       780 |     </tspan><tspan class="text-ok">[OK]</tspan>
+    </text>
+
+    <!-- Row 3: .clinerules (WARN) -->
+    <text x="55" y="300">
+      <tspan class="text-light">.clinerules                                    |     9,280 |     2,320 |   </tspan><tspan class="text-warn">[WARN]</tspan>
+    </text>
+
+    <!-- Row 4: .cursorrules (ALERT) -->
+    <text x="55" y="326">
+      <tspan class="text-light">.cursorrules                                   |    24,580 |     6,145 |  </tspan><tspan class="text-alert">[ALERT]</tspan>
+    </text>
+
+    <!-- Table Footer Divider -->
+    <text x="55" y="348" class="dim">--------------------------------------------------------------------------------</text>
+
+    <!-- Summary Stats -->
+    <text x="55" y="374">
+      <tspan fill="#9ca3af">Total Bytes:     </tspan><tspan class="text-white" font-weight="700">39,430 B (38.5 KB)</tspan>
+    </text>
+    <text x="55" y="398">
+      <tspan fill="#9ca3af">Total Tokens:    </tspan><tspan fill="#38bdf8" font-weight="700">~9,857</tspan><tspan fill="#9ca3af"> estimated base tokens per turn</tspan>
+    </text>
+    <text x="55" y="422">
+      <tspan fill="#9ca3af">Files Detected:  </tspan><tspan class="text-white">4 of 4</tspan>
+    </text>
+
+    <text x="55" y="444" class="cyan">================================================================================</text>
+
+    <!-- Irregular Hook Alert Box -->
+    <g transform="translate(55, 462)">
+      <rect x="0" y="0" width="890" height="92" rx="6" fill="url(#alert-grad)" stroke="#ef4444" stroke-width="1.2" stroke-opacity="0.8" />
+
+      <text x="20" y="30" fill="#f87171" font-weight="700" font-size="15">🚨 IRREGULAR HOOK DETECTED: .git/hooks/pre-commit:14</text>
+      <text x="20" y="54" fill="#fca5a5" font-size="13.5">
+        <tspan fill="#9ca3af">   Command: </tspan><tspan fill="#fca5a5" font-weight="600">'claude review --strict &amp;&amp; npm test'</tspan><tspan fill="#9ca3af"> (unmetered API execution)</tspan>
+      </text>
+      <text x="20" y="76" font-size="13.5">
+        <tspan fill="#38bdf8" font-weight="700">   ➜ Auto-Remediate: </tspan><tspan fill="#f3f4f6" font-weight="600">token-diet --fix-hooks --dry-run</tspan><tspan fill="#9ca3af"> (surgical subcommand neutralization)</tspan>
+      </text>
+    </g>
+
+    <!-- Cursor prompt at bottom -->
+    <text x="55" y="582">
+      <tspan class="prompt">jose@macbook</tspan><tspan class="dim">:</tspan><tspan fill="#60a5fa">~/my-ai-repo</tspan><tspan fill="#f3f4f6">$ </tspan><tspan fill="#60a5fa" font-weight="700">_</tspan>
+    </text>
+  </g>
+</svg>

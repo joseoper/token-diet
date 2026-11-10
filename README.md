@@ -19,7 +19,7 @@ Zero-dependency CLI for **Claude Code**, **Cursor**, **Codex**, **Gemini**, and 
 
 ---
 
-## Why Token Diet?
+## 1. Why Token Diet?
 
 AI coding assistants inject instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`) into the system prompt on **every single turn**. A bloated 25 KB prompt file forces the model to re-process ~6,000–8,400 tokens on every message, draining active context windows and paying full input rates whenever prompt cache entries expire.
 
@@ -46,7 +46,24 @@ Worse, some local developer tools quietly install hidden `pre-commit` hooks that
 
 ---
 
-## Quick 30-Second Install
+## 2. Real Terminal Audit in Action
+
+Running `token-diet` in your repository delivers an instant, zero-latency diagnostic of your active prompt directives and git hook security:
+
+![Token Diet Real Terminal Audit](assets/terminal_preview.png)
+
+### Health Status Indicators
+
+| Indicator | Byte Threshold | Estimated Tokens | What it Means & Recommended Action |
+|---|:---:|:---:|---|
+| 🟢 `[OK]` | `< 4 KB` | `< 1,000 tokens` | **Optimal Context:** Ultra-lean static directive: leaves maximum headroom for codebase context while minimizing cache-miss re-ingestion costs. |
+| 🟡 `[WARN]` | `4 KB – 16 KB` | `1,000 – 4,000 tokens` | **Moderate Size:** Acceptable, but review for duplicate instructions or unneeded verbosity. |
+| 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **Severe Prompt Bloat:** Monolithic rules degrade reasoning and waste context budget every turn. Decouple into On-Demand Skills. |
+| 🚨 `[HOOK ALERT]` | — | — | **Hidden Token Bleed:** The active `pre-commit` hook sends code to cloud LLMs on every `git commit`. Replace with static linters. |
+
+---
+
+## 3. Quick 30-Second Install
 
 ### Via Homebrew (macOS & Linux)
 ```bash
@@ -79,71 +96,27 @@ PYTHONPATH=src python3 -m token_diet
 
 ---
 
-## Real Terminal Output & Health Indicators
+## 4. Core Capabilities: Audit, Detect, Enforce, Recommend
 
-### 1. Standard Health Check Output
-Running `token-diet` in any clean project repository inspects local directives and verifies hook safety in milliseconds:
+`token-diet` organizes token defense across four clear architectural responsibilities:
 
-```bash
-token-diet
+```mermaid
+flowchart LR
+    A["1. AUDIT\nStatic filesystem\ninspection"] --> B["2. DETECT\nBloat & irregular\nhook alerts"]
+    B --> C["3. ENFORCE\nCI & pre-commit\nregression gates"]
+    C --> D["4. RECOMMEND\nLUT Router & runtime\nhygiene patterns"]
 ```
 
-```text
-================================================================================
-TOKEN DIET: FOOTPRINT & CONTEXT AUDIT
-================================================================================
-File / Directive                               |     Bytes |    Tokens |   Status
---------------------------------------------------------------------------------
-/Users/developer/my-project/AGENTS.md          |       962 |       240 |     [OK]
-/Users/developer/my-project/.cursorrules       |     1,240 |       310 |     [OK]
-================================================================================
-Total Bytes:     2,202 B
-Total Tokens:    ~550 estimated base tokens per turn
-Files Detected:  2 of 2
-```
-
-### 2. Bloat & Rogue Hook Alert Output
-When instruction files grow oversized or unmonitored git hooks silently trigger cloud AI reviews, `token-diet` displays actionable alerts:
-
-```bash
-token-diet
-```
-
-```text
-================================================================================
-TOKEN DIET: FOOTPRINT & CONTEXT AUDIT
-================================================================================
-File / Directive                               |     Bytes |    Tokens |   Status
---------------------------------------------------------------------------------
-/Users/developer/my-project/AGENTS.md          |    24,500 |     6,125 |  [ALERT]
-/Users/developer/my-project/docs/guide.md      |     8,200 |     2,050 |   [WARN]
-================================================================================
-Total Bytes:     32,700 B
-Total Tokens:    ~8,175 estimated base tokens per turn
-Files Detected:  2 of 2
-
-🚨 IRREGULAR HOOK DETECTED:
-  • [pre-commit] Pre-commit hook invokes AI/LLM review tooling (gga, opencode). This causes invisible token consumption on every commit.
-    Path: /Users/developer/my-project/.git/hooks/pre-commit
-  💡 Tip: Run 'token-diet --fix-hooks' to automatically neutralize silent AI invocations.
-
-⚠️  CONTEXT BLOAT DETECTED:
-  Files marked [ALERT] exceed 16 KB (>4k tokens) and severely penalize context windows.
-  Recommendation: Decouple procedures into On-Demand Skills using the LUT Router pattern.
-```
-
-### Health Status Indicators
-
-| Indicator | Byte Threshold | Estimated Tokens | What it Means & Recommended Action |
-|---|:---:|:---:|---|
-| 🟢 `[OK]` | `< 4 KB` | `< 1,000 tokens` | **Optimal Context:** Ultra-lean static directive: leaves maximum headroom for codebase context while minimizing cache-miss re-ingestion costs. |
-| 🟡 `[WARN]` | `4 KB – 16 KB` | `1,000 – 4,000 tokens` | **Moderate Size:** Acceptable, but review for duplicate instructions or unneeded verbosity. |
-| 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **Severe Prompt Bloat:** Monolithic rules degrade reasoning and waste context budget every turn. Decouple into On-Demand Skills. |
-| 🚨 `[HOOK ALERT]` | — | — | **Hidden Token Bleed:** The active `pre-commit` hook sends code to cloud LLMs on every `git commit`. Replace with static linters. |
+| Capability | Scope & Mechanism | Actionable Outcome |
+|---|---|---|
+| **Audit** | Static inspection of filesystem artifacts: prompt directives (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`), global workstation defaults (`--global`), declared MCP tool schemas (`--mcp`), and heading breakdowns (`--sections`). | Complete inventory of base token injection costs per turn before execution. |
+| **Detect** | Heuristic evaluation identifying oversized monolithic rules (> 16 KB / > 4,000 tokens) and irregular git hooks in `.git/hooks/pre-commit` or `core.hooksPath` running silent AI reviews. | Instant visual flags (`[WARN]`, `[ALERT]`, `🚨 IRREGULAR HOOK DETECTED`) pointing to the exact line and file. |
+| **Enforce** | Deterministic quality gates for CI pipelines and pre-commit checks: strict limits (`--strict`), hard token ceilings (`--max-tokens <N>`), and baseline regression budgets (`--baseline`, `--max-delta <%>`). | Blocks PRs and commits that introduce unbudgeted prompt expansion or creeping regressions. |
+| **Recommend** | Architectural solutions and runtime practices: the Look-Up Table (LUT) Router pattern, on-demand skill decoupling (`skills/<name>/SKILL.md`), and in-session execution hygiene. | Drops static base tokens by 91% while preserves rule accessibility on-demand without cognitive clutter. |
 
 ---
 
-## Where Token Diet Fits: Structural Context vs. Runtime Gateways
+## 5. Where Token Diet Fits: Structural Context vs. Runtime Gateways
 
 Most LLM optimization tooling operates downstream at runtime—proxying HTTP traffic or compressing prompt text on the fly. `token-diet` addresses the upstream architectural cause: **unmanaged, bloated instruction files, declared MCP schemas, and unmetered git hooks living directly in your repository**.
 
@@ -168,27 +141,7 @@ Most LLM optimization tooling operates downstream at runtime—proxying HTTP tra
 
 ---
 
-## Core Capabilities: Audit, Detect, Enforce, Recommend
-
-`token-diet` organizes token defense across four clear architectural responsibilities:
-
-```mermaid
-flowchart LR
-    A["1. AUDIT\nStatic filesystem\ninspection"] --> B["2. DETECT\nBloat & irregular\nhook alerts"]
-    B --> C["3. ENFORCE\nCI & pre-commit\nregression gates"]
-    C --> D["4. RECOMMEND\nLUT Router & runtime\nhygiene patterns"]
-```
-
-| Capability | Scope & Mechanism | Actionable Outcome |
-|---|---|---|
-| **Audit** | Static inspection of filesystem artifacts: prompt directives (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`), global workstation defaults (`--global`), declared MCP tool schemas (`--mcp`), and heading breakdowns (`--sections`). | Complete inventory of base token injection costs per turn before execution. |
-| **Detect** | Heuristic evaluation identifying oversized monolithic rules (> 16 KB / > 4,000 tokens) and irregular git hooks in `.git/hooks/pre-commit` or `core.hooksPath` running silent AI reviews. | Instant visual flags (`[WARN]`, `[ALERT]`, `🚨 IRREGULAR HOOK DETECTED`) pointing to the exact line and file. |
-| **Enforce** | Deterministic quality gates for CI pipelines and pre-commit checks: strict limits (`--strict`), hard token ceilings (`--max-tokens <N>`), and baseline regression budgets (`--baseline`, `--max-delta <%>`). | Blocks PRs and commits that introduce unbudgeted prompt expansion or creeping regressions. |
-| **Recommend** | Architectural solutions and runtime practices: the Look-Up Table (LUT) Router pattern, on-demand skill decoupling (`skills/<name>/SKILL.md`), and in-session execution hygiene. | Drops static base tokens by 91% while preserves rule accessibility on-demand without cognitive clutter. |
-
----
-
-## Context Savings Model: Simulated 20-Turn Session
+## 6. Context Savings Model & Methodology
 
 ### Technical Rigor: How Prompt Caching Really Works (and Why Bloat Still Kills)
 
@@ -245,21 +198,20 @@ Below is a simulated 20-turn session model measuring base context consumption an
 
 ---
 
-## Interactive CLI Usage & CI/CD Enforcement
+## 7. Practical CLI Recipes & Usage
 
 ### 1. Auto-Fix Silent Pre-Commit Hooks (`--fix-hooks`)
-Neutralize unmonitored AI review tooling in `.git/hooks/pre-commit` in a single command with an automatic backup (`.git/hooks/pre-commit.bak`):
+Neutralize unmonitored AI review tooling in `.git/hooks/pre-commit` surgically: replaces only the offending subcommand, creates a `.bak` backup, and preserves permissions:
 
 ```bash
-token-diet --fix-hooks
-```
+# Preview changes with a colored unified diff without modifying files:
+token-diet --fix-hooks --dry-run
 
-**Example Output:**
-```text
-🛠️  AUTO-REMEDIATION: PRE-COMMIT HOOKS NEUTRALIZED
-  • Backup saved: /Users/developer/my-project/.git/hooks/pre-commit.bak
-  • Neutralized 1 AI review invocation(s).
-  • Safe pre-commit hook is active without silent token bleed.
+# Run with interactive confirmation [y/N]:
+token-diet --fix-hooks
+
+# Run non-interactively (ideal for automation and scripts):
+token-diet --fix-hooks -y
 ```
 
 ### 2. Audit System-Wide Global Prompts (`--global`)
@@ -317,8 +269,6 @@ web-search                     | remote    |     0 |       142 |        35 |    
 --------------------------------------------------------------------------------
 ```
 
-Config-declared `tools` blocks are counted and included in each server's payload. Schemas fetched by a server at runtime are not visible to a local audit; the reported figure is the local injection cost floor.
-
 ### 6. Fail on Regression vs a Saved Baseline (`--baseline`, `--max-delta`)
 Record a baseline once, then gate every pull request against it. This catches slow, incremental growth that a fixed threshold never notices:
 
@@ -330,9 +280,11 @@ token-diet --json > token-baseline.json
 token-diet --baseline token-baseline.json --max-delta 5
 ```
 
-`--baseline` accepts any `--json` report (`{"summary": {"total_tokens": N}}`) or a minimal `{"total_tokens": N}` file. `--max-delta` exits with code `1` only when tokens **increase** beyond the given percentage; a decrease, an unchanged total, or growth exactly at the budget passes.
+---
 
-### 7. Automated CI / Pre-Commit Gates (`--strict`, `--max-tokens`)
+## 8. Automated CI/CD & Pre-Commit Enforcement
+
+### Automated CI / Pre-Commit Gates (`--strict`, `--max-tokens`)
 Integrate into your CI pipeline or Git pre-commit workflow to prevent prompt regressions:
 
 ```bash
@@ -343,14 +295,32 @@ token-diet --max-tokens 2500 AGENTS.md
 token-diet --strict docs/
 ```
 
-### 8. Structured Telemetry Output (`--json`)
+### Structured Telemetry Output (`--json`)
 Emit structured JSON for automated pipelines, threshold assertions, or telemetry dashboards:
 
 ```bash
 token-diet --json
 ```
 
----
+### GitHub Actions CI Gate Example
+
+Add this workflow to `.github/workflows/token-gate.yml` to block PRs with prompt bloat:
+
+```yaml
+name: Token Budget Gate
+on: [pull_request]
+
+jobs:
+  token-diet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install token-diet-cli
+      - run: token-diet --max-tokens 2500 AGENTS.md
+```
 
 ### What To Do When a Leak is Detected (Action Paths)
 
@@ -359,10 +329,9 @@ When `token-diet` flags an irregularity, follow the corresponding action path (d
 #### Path A: When an Irregular Git Hook is Flagged (`🚨 IRREGULAR HOOK DETECTED`)
 * **Problem:** A local hook inside `.git/hooks/pre-commit` secretly sends git diffs to cloud AI tools on every single commit.
 * **Action Path:**
-  1. Inspect the script: `cat .git/hooks/pre-commit`
-  2. Remove or comment out the automated AI review invocation.
-  3. Replace it with fast, local deterministic linters (`ruff`, `eslint`, `biome`).
-  4. Relocate semantic AI reviews to **Pull Request gates in CI** (see [CI/CD Integration](docs/ci-integration.md)), where reviews are metered and visible.
+  1. Preview neutralization safely: `token-diet --fix-hooks --dry-run`
+  2. Apply surgical remediation: `token-diet --fix-hooks`
+  3. Relocate semantic AI reviews to **Pull Request gates in CI** (see [CI/CD Integration](docs/ci-integration.md)), where reviews are metered and visible.
 
 #### Path B: When an Agent Directive is Bloated (`🔴 [ALERT]`)
 * **Problem:** A root instruction file (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) exceeds 16 KB (> 4,000 tokens), inflicts severe cache-miss penalties upon 5-min TTL expiration and starves active context window.
@@ -393,7 +362,7 @@ Run `token-diet` in this repository. If you detect any files marked [ALERT] or [
 
 ---
 
-## Limitations & Technical FAQ
+## 9. Limitations & Technical FAQ
 
 ### Limitations & Technical Boundaries
 
@@ -422,7 +391,9 @@ To maintain zero runtime dependencies and millisecond-level execution, `token-di
 
 ---
 
-## Running Tests
+## 10. Architecture, Testing & Advanced Documentation
+
+### Running Tests
 
 Token Diet includes an automated test suite with deterministic coverage:
 
@@ -430,9 +401,7 @@ Token Diet includes an automated test suite with deterministic coverage:
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
----
-
-## Repository Structure
+### Repository Structure
 
 ```
 token-diet/
@@ -440,14 +409,16 @@ token-diet/
 │   └── workflows/
 │       └── ci.yml             # Automated multi-version CI test runner
 ├── assets/
-│   ├── comparison_matrix.jpg       # Architecture comparison matrix
+│   ├── terminal_preview.png   # Real terminal audit screenshot
+│   ├── terminal_preview.svg   # Vector SVG terminal preview
+│   ├── comparison_matrix.jpg  # Architecture comparison matrix
 │   ├── context_benchmark_chart.jpg # Context footprint benchmark chart
-│   ├── logo.png                    # Public Open-Source banner logo (1200x400)
-│   ├── logo_icon.png               # Public Open-Source square icon (512x512)
-│   ├── logo_icon.svg               # Vector SVG icon source
-│   ├── logo_agensi.png             # Agensi Marketplace edition banner logo (1200x400)
-│   ├── logo_agensi_icon.png        # Agensi Marketplace edition square icon (512x512)
-│   └── logo_agensi_icon.svg        # Agensi vector SVG icon source
+│   ├── logo.png               # Public Open-Source banner logo (1200x400)
+│   ├── logo_icon.png          # Public Open-Source square icon (512x512)
+│   ├── logo_icon.svg          # Vector SVG icon source
+│   ├── logo_agensi.png        # Agensi Marketplace edition banner logo (1200x400)
+│   ├── logo_agensi_icon.png   # Agensi Marketplace edition square icon (512x512)
+│   └── logo_agensi_icon.svg   # Agensi vector SVG icon source
 ├── docs/
 │   ├── remediation-playbook.md # Step-by-step token containment and LUT routing
 │   └── ci-integration.md       # CI workflows & pre-commit gatekeeper examples
@@ -475,17 +446,13 @@ token-diet/
 └── README.md                  # Project overview and documentation
 ```
 
----
-
-## Platform Compatibility
+### Platform Compatibility
 
 Token Diet is OS-agnostic and cross-platform:
 - **CLI Diagnostic Tool:** Pure Python standard library with zero third-party dependencies. Runs seamlessly on **macOS**, **Linux**, and **Windows** (Python >= 3.8).
 - **Universal Methodology:** Core principles apply across all assistants (Claude Code, Gemini CLI, OpenAI Codex, OpenCode, Cursor, Windsurf).
 
----
-
-## Documentation & Guides
+### Documentation & Guides
 
 For in-depth operational procedures and automated pipeline setups:
 - **[Remediation Playbook](docs/remediation-playbook.md):** Step-by-step runbook to prune prompt files, configure reasoning effort, and contain background services.
@@ -493,8 +460,6 @@ For in-depth operational procedures and automated pipeline setups:
 - **[Agent Directives (AGENTS.md)](AGENTS.md):** Operational guidelines for AI coding assistants working on this codebase.
 - **[Contributing Guidelines](CONTRIBUTING.md):** How to run tests, submit pull requests, and coding standards.
 
----
-
-## License
+### License
 
 This project is licensed under the terms of the [MIT License](LICENSE).
