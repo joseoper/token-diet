@@ -82,7 +82,7 @@ To guarantee zero external dependencies and sub-10 ms execution, `token-diet` op
 
 ## 4. Test Suite & Quality Assurance
 
-The codebase includes an automated unit test suite with 100% deterministic coverage:
+The codebase includes an automated unit test suite with 131 isolated, deterministic test cases covering core modules and CLI workflows:
 
 ```bash
 # Run the complete test suite

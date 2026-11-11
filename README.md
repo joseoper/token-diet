@@ -133,7 +133,7 @@ Explore the complete documentation for advanced workflows, architecture, and CI 
 Contributions, issues, and feature requests are welcome. Review [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for local setup and coding guidelines:
 
 ```bash
-# Run unit tests (100% deterministic coverage)
+# Run unit tests (131 automated unit tests)
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
