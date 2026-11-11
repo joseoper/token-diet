@@ -8,7 +8,8 @@ Only the latest release line receives active security updates and vulnerability 
 
 | Version | Supported          | Notes |
 | ------- | ------------------ | ----- |
-| 0.2.x   | :white_check_mark: | Active release line (v0.2.3+ contains hardened containment) |
+| 0.3.x   | :white_check_mark: | Current active release line |
+| 0.2.x   | :white_check_mark: | Maintained for bug/security fixes (v0.2.3+ contains hardened containment) |
 | < 0.2.3 | :x:                | Deprecated. Vulnerable to symlink traversal and DoS vectors |
 
 We strongly recommend all users upgrade to **v0.2.3** or later:

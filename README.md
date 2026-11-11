@@ -57,6 +57,8 @@ Files Detected:  2 of 2
 
 ## Quick 30-Second Install
 
+> **Compatibility:** Requires **Python >= 3.10** (`python3 --version`) and standard library only (0 external dependencies). Compatible with macOS, Linux, and Windows.
+
 ### Homebrew (macOS & Linux)
 ```bash
 brew install joseoper/tap/token-diet

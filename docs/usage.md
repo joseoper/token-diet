@@ -6,6 +6,23 @@
 
 ## 1. Quick Start
 
+### Installation & Environment Requirements
+
+`token-diet` requires **Python >= 3.10** and operates with zero runtime dependencies (pure standard library: `sys`, `os`, `json`, `argparse`, `typing`).
+
+```bash
+# Recommended: Isolated installation via pipx
+pipx install token-diet-cli
+
+# Via Homebrew (macOS & Linux):
+brew install joseoper/tap/token-diet
+
+# Via standard pip:
+pip install token-diet-cli
+```
+
+### Basic Execution
+
 Run `token-diet` from the root of any repository to audit active agent directives and pre-commit hooks:
 
 ```bash
