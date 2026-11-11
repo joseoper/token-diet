@@ -52,7 +52,13 @@ sed -i '' -E "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
 # 4. Clean and build distribution packages
 echo "[3/6] Building distribution packages (wheel + sdist)..."
 rm -rf dist/ build/ src/*.egg-info
-python3 -m build
+if command -v uv >/dev/null 2>&1; then
+  uv build
+elif python3 -m build --help >/dev/null 2>&1; then
+  python3 -m build
+else
+  pipx run build
+fi
 
 # 5. Commit and tag release
 echo "[4/6] Creating git release commit and tag ${TAG}..."
@@ -67,6 +73,7 @@ git push public "${TAG}"
 # 6. Create GitHub Release with binary assets
 echo "[5/6] Creating GitHub Release with attached assets..."
 gh release create "${TAG}" dist/token_diet_cli-"${VERSION}"* \
+  -R joseoper/token-diet \
   --title "${TAG}" \
   --generate-notes
 
