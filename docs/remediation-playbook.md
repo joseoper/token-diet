@@ -117,7 +117,7 @@ A static, long prompt **does NOT fail cache eligibility by itself**. As long as 
 
 #### 2. The True Operational Cost of Bloat
 Even when cache hits occur, monolithic prompts create severe operational bottlenecks:
-* **The Cache Miss / TTL Expiry Exposure:** Cache entries are ephemeral. In Anthropic, prompt cache TTL is typically **5 minutes of developer pause**; in OpenAI, cache chunks are evicted under memory pressure. When TTL expires or cache is evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
+* **The Cache Miss / TTL Expiry Exposure:** Cache entries are ephemeral. In Anthropic, prompt cache blocks feature a **5-minute default TTL that refreshes with each subsequent query hitting the cache**, while in OpenAI, cache chunks are evicted dynamically under memory pressure. When the TTL expires after an idle period or cache blocks are evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
 * **Context Window Starvation:** Cache hit or miss, **cached tokens consume active context window capacity**. 8,400 tokens of static rules permanently rob the model of active attention on every turn.
 * **Reasoning Dilution ("Needle-in-a-Haystack" Failure):** Drowning the model in 25 KB of monolithic guidelines dilutes attention. Frontier models suffer retrieval and instruction-following degradation when key constraints are buried in pages of irrelevant protocols.
 

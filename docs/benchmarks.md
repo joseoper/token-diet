@@ -73,7 +73,7 @@ What actually invalidates prompt caching is **modifying the prefix or injecting 
 
 ### The Real Cost of Bloat
 Even when prefixes are kept strictly immutable, monolithic prompts inflict severe operational damage:
-* **The Cache Miss Penalty:** Cache entries are ephemeral. In Anthropic, prompt cache TTL is typically **5 minutes of developer pause**; in OpenAI, cache blocks are evicted dynamically under memory pressure. When TTL expires or cache is evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
+* **The Cache Miss Penalty:** Cache entries are ephemeral. In Anthropic, prompt cache blocks have a **5-minute default TTL that refreshes with each subsequent query hitting the cache**, while in OpenAI, cached prefix blocks are evicted dynamically based on server load and memory pressure. If the session is paused long enough for the TTL to expire or if cache blocks are evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
 * **Context Window Starvation:** Cache hit or miss, **cached tokens still occupy active context window capacity**. An 8,400-token static prompt permanently subtracts 8,400 tokens from the model's attention span on *every single turn*.
 * **Reasoning Dilution ("Needle-in-a-Haystack" Degradation):** Drowning the model in 25 KB of monolithic guidelines dilutes attention. Frontier models suffer retrieval and instruction-following degradation when key architectural constraints are buried under pages of irrelevant protocols.
 
