@@ -41,7 +41,7 @@ Files Detected:  2 of 2
 |:---:|:---:|:---:|---|
 | 🟢 `[OK]` | `< 4 KB` | `< 1,000 tokens` | **Low Footprint:** Lean static directive. Leaves maximum headroom for codebase context while minimizing cache-miss re-ingestion costs. |
 | 🟡 `[WARN]` | `4 KB – 16 KB` | `1,000 – 4,000 tokens` | **Moderate Footprint:** Acceptable size, but consider extracting specialized procedures into on-demand skills. |
-| 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **High Footprint:** Monolithic rules risk diluting model attention. Recommended: decouple into On-Demand Skills. |
+| 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **High Footprint:** Monolithic rules consume substantial working context and increase cache-miss exposure. Recommended: decouple into On-Demand Skills. |
 | 🚨 `[HOOK ALERT]` | — | — | **Hidden Execution Leak:** Active `pre-commit` hook invokes cloud LLMs on every `git commit`. Replace with deterministic linters. |
 
 > **Architectural Recommendation:** Aim to keep root directives (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) under **~3 KB (< 750 tokens)**, housing detailed runbooks in `skills/<name>/SKILL.md`.

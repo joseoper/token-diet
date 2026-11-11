@@ -9,9 +9,9 @@ This document details the simulation model, empirical framework, and comparative
 Modern AI coding assistants (Claude Code, Cursor, Codex, OpenCode, Windsurf) operate in multi-turn conversational loops. As repositories scale, teams inadvertently bloat instruction directives (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`), inject dozens of unused MCP schemas, and trigger unmetered git hooks.
 
 This structural bloat imposes three operational penalties:
-1. **Context Window Starvation:** Every token of idle instructions permanently robs working memory from actual source code, test failures, and compiler diagnostics.
-2. **Attention Dilution (*Lost-in-the-Middle*):** Drowning the model in 25+ KB of monolithic rules degrades instruction-following accuracy and increases hallucination risks on complex algorithmic tasks.
-3. **Cache-Miss Financial Exposure:** While frontier providers offer prompt caching discounts, cache blocks are ephemeral (e.g., 5-minute TTL in Anthropic, dynamic eviction in OpenAI). When a cache miss occurs, the entire bloated preamble must be re-ingested at full input rates.
+1. **Reduced Working Context Space:** Every token of idle instructions permanently subtracts capacity from working memory that could otherwise hold actual source code, test traces, and compiler diagnostics.
+2. **Instruction Clutter & Overhead:** Forcing the model to process 25+ KB of monolithic guidelines on every turn injects thousands of irrelevant instructions into the prompt payload.
+3. **Cache-Miss Financial Exposure:** While frontier providers offer prompt caching discounts, cache blocks are ephemeral (e.g., 5-minute default refreshable TTL in Anthropic, dynamic eviction in OpenAI). When a cache miss occurs, the entire bloated preamble must be re-ingested at full input rates.
 
 ---
 
@@ -34,7 +34,7 @@ To evaluate the operational impact of prompt architecture, we model a standard 2
 | **Static Directive Footprint** | ~8,400 tokens / turn | ~750 tokens / turn | **-91% static footprint** |
 | **Share of Initial Working Context (~11k tokens)** | **~75%** static guidelines | **< 8%** static guidelines | **+67% initial working capacity freed** |
 | **Cache Miss Re-ingestion Exposure** | 8,400 tokens / miss | 750 tokens / miss | **-91% re-ingestion risk** |
-| **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes instruction dilution & Lost-in-the-Middle degradation** |
+| **Instruction Relevance & Focus** | High volume of irrelevant rules | Task-focused on active procedures | **Significantly reduces unneeded instructions; aids relevant rule retrieval** |
 
 ### Methodological Parameters & Rigor
 
@@ -74,8 +74,8 @@ What actually invalidates prompt caching is **modifying the prefix or injecting 
 ### The Real Cost of Bloat
 Even when prefixes are kept strictly immutable, monolithic prompts inflict severe operational damage:
 * **The Cache Miss Penalty:** Cache entries are ephemeral. In Anthropic, prompt cache blocks have a **5-minute default TTL that refreshes with each subsequent query hitting the cache**, while in OpenAI, cached prefix blocks are evicted dynamically based on server load and memory pressure. If the session is paused long enough for the TTL to expire or if cache blocks are evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
-* **Context Window Starvation:** Cache hit or miss, **cached tokens still occupy active context window capacity**. An 8,400-token static prompt permanently subtracts 8,400 tokens from the model's attention span on *every single turn*.
-* **Reasoning Dilution ("Needle-in-a-Haystack" Degradation):** Drowning the model in 25 KB of monolithic guidelines dilutes attention. Frontier models suffer retrieval and instruction-following degradation when key architectural constraints are buried under pages of irrelevant protocols.
+* **Working Context Constriction:** Cache hit or miss, **cached tokens still occupy active context window capacity**. An 8,400-token static prompt permanently subtracts 8,400 tokens from the model's available working memory on *every single turn*.
+* **Instruction Noise & Search Space:** Forcing 25 KB of monolithic guidelines into context increases prompt clutter with non-applicable rules. Decoupling into on-demand skills ensures that only guidelines pertinent to the active task occupy the prompt, aiding retrieval of relevant instructions.
 
 ---
 

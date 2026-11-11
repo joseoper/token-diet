@@ -23,7 +23,7 @@ Zero-dependency CLI for **Claude Code**, **Cursor**, **Codex**, **Gemini CLI**, 
 
 AI coding assistants accumulate hidden context overhead through oversized instruction directives (`.cursorrules`, `AGENTS.md`, `CLAUDE.md`), declared but unused MCP tool schemas, and unmetered git hooks that trigger cloud LLMs on every local commit.
 
-This structural bloat causes **context window starvation**, **attention dilution** (*Lost in the Middle*), and **costly re-ingestion penalties** upon prompt cache TTL expiration.
+This structural bloat **reduces available working context for actual code and diagnostics**, introduces **unnecessary idle instructions into every prompt turn**, and creates **costly re-ingestion exposure** upon prompt cache TTL expiration.
 
 `token-diet` audits these structural sources directly on your local filesystem **before** tokens are loaded, serialized, or billed.
 

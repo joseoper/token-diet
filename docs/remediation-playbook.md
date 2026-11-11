@@ -118,8 +118,8 @@ A static, long prompt **does NOT fail cache eligibility by itself**. As long as 
 #### 2. The True Operational Cost of Bloat
 Even when cache hits occur, monolithic prompts create severe operational bottlenecks:
 * **The Cache Miss / TTL Expiry Exposure:** Cache entries are ephemeral. In Anthropic, prompt cache blocks feature a **5-minute default TTL that refreshes with each subsequent query hitting the cache**, while in OpenAI, cache chunks are evicted dynamically under memory pressure. When the TTL expires after an idle period or cache blocks are evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
-* **Context Window Starvation:** Cache hit or miss, **cached tokens consume active context window capacity**. 8,400 tokens of static rules permanently rob the model of active attention on every turn.
-* **Reasoning Dilution ("Needle-in-a-Haystack" Failure):** Drowning the model in 25 KB of monolithic guidelines dilutes attention. Frontier models suffer retrieval and instruction-following degradation when key constraints are buried in pages of irrelevant protocols.
+* **Working Context Constriction:** Cache hit or miss, **cached tokens still occupy active context window capacity**. An 8,400-token static prompt permanently subtracts 8,400 tokens from the model's available working memory on *every single turn*.
+* **Instruction Noise & Search Space:** Forcing 25 KB of monolithic guidelines into context increases prompt clutter with non-applicable rules. Decoupling into on-demand skills ensures that only guidelines pertinent to the active task occupy the prompt, aiding retrieval of relevant instructions.
 
 ### 2.2 Simulated 20-Turn Session Model: Monolithic Directives vs. Token Diet LUT Router
 
@@ -138,7 +138,7 @@ Below is a simulated 20-turn session model comparing base context consumption an
 | **Static Directive Footprint** | ~8,400 tokens / turn | ~750 tokens / turn | **-91% static footprint** |
 | **Share of Initial Working Context (~11k tokens)** | **~75%** static guidelines | **< 8%** static guidelines | **+67% initial working capacity freed** |
 | **Cache Miss Re-ingestion Exposure** | 8,400 tokens / miss | 750 tokens / miss | **-91% re-ingestion risk** |
-| **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
+| **Instruction Relevance & Focus** | High volume of irrelevant rules | Task-focused on active procedures | **Significantly reduces unneeded instructions; aids relevant rule retrieval** |
 
 > [!NOTE] **Methodological Framework & Model Parameters**
 > - **Token Estimation Heuristic:** Based on the standard `cl100k_base` heuristic (~4 characters/bytes per token for structured Markdown/prose).
