@@ -35,7 +35,10 @@ Files Detected:  2 of 2
 
 ## 2. Status Indicators & Heuristic Thresholds
 
-`token-diet` evaluates files against byte thresholds calibrated for LLM context windows:
+`token-diet` evaluates files against heuristic byte thresholds designed to balance instruction completeness with context efficiency.
+
+> [!NOTE]
+> **Heuristics vs. Provider Limits:** The `[OK]`, `[WARN]`, and `[ALERT]` thresholds are pragmatic engineering heuristics, **not hard limits mandated by AI model providers**. A file exceeding 16 KB remains completely valid and ingestible by any LLM. These indicators simply serve to alert teams when static instruction files begin to consume significant portions of early turn payloads and increase cache-miss exposure. Teams can override or configure strict limits in CI using `--max-tokens <N>` and `--max-delta <%>`.
 
 | Status Badge | Byte Range | Estimated Tokens | Architectural Meaning & Recommended Action |
 |:---:|:---:|:---:|---|
@@ -44,7 +47,7 @@ Files Detected:  2 of 2
 | 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **High Footprint:** Monolithic rules consume substantial working context and increase cache-miss exposure. Recommended: decouple into On-Demand Skills. |
 | 🚨 `[HOOK ALERT]` | — | — | **Hidden Execution Leak:** Active `pre-commit` hook invokes cloud LLMs on every `git commit`. Replace with deterministic linters. |
 
-> **Architectural Recommendation:** Aim to keep root directives (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) under **~3 KB (< 750 tokens)**, housing detailed runbooks in `skills/<name>/SKILL.md`.
+> **Architectural Recommendation:** Aim to keep root directives (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) under **~3 KB (< 750 tokens)**, housing detailed runbooks in `skills/<name>/SKILL.md`. This threshold is a rule of thumb for clean architectural routing, not an absolute metric of instruction quality.
 
 ---
 

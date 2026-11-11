@@ -52,7 +52,7 @@ Handles CLI option parsing (`argparse`), path resolution, status determination (
 
 ### `metrics.py` — Token Estimation & Footprint Calibration
 - Implements the standard `cl100k_base` / `o200k_base` heuristic (~4 characters/bytes per token for structured prose and Markdown).
-- Centralizes architectural thresholds:
+- Centralizes pragmatic architectural thresholds (heuristics designed to protect context windows, rather than provider-imposed constraints):
   - `THRESHOLD_WARN_BYTES = 4,096` (~1,000 tokens)
   - `THRESHOLD_ALERT_BYTES = 16,384` (~4,000 tokens)
 
