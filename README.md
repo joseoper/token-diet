@@ -132,7 +132,7 @@ Explore the complete documentation for advanced workflows, architecture, and CI 
 
 ## Contributing
 
-Contributions, issues, and feature requests are welcome. Review [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for local setup and coding guidelines:
+Contributions, issues, and feature requests are welcome. Review [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, development guidelines, and pull request workflows:
 
 ```bash
 # Run the test suite (131 deterministic tests)

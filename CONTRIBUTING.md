@@ -8,12 +8,19 @@ Please be respectful, constructive, and considerate of all contributors and user
 
 ## Core Engineering Principles
 
-1. **Zero External Dependencies:** The CLI tool strictly utilizes the Python standard library (`sys`, `os`, `json`, `argparse`). Do not introduce third-party runtime dependencies.
-2. **Cross-Platform Compatibility:** Code must execute seamlessly across macOS, Linux, and Windows. Use `os.path.expanduser()` and standard path handling.
-3. **Test-Driven Development (TDD):** Every bugfix, heuristic change, or new CLI flag must include accompanying automated unit tests.
-4. **Conventional Commits:** Write clear commit messages using the Conventional Commits format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-5. **Security & Privacy:** Strictly zero API keys, secrets, personal emails, or machine-specific absolute paths in code or tests.
-6. **Governance & Metadata Integrity:** Keep project metadata in sync with code updates:
+1. **Zero External Dependencies:** `src/token_diet/` strictly utilizes the Python standard library (`sys`, `os`, `json`, `argparse`, `typing`). Do not introduce third-party runtime dependencies.
+2. **Cross-Platform Compatibility:** Code must execute seamlessly across macOS, Linux, and Windows. Use standard path handling (`os.path.expanduser()`, `os.path.join`).
+3. **Test-Driven Development (TDD):** Every bugfix, heuristic change, or new CLI flag must include accompanying automated unit tests under `tests/`:
+   - Feature modules keep isolated unit tests in `tests/test_<module>.py`.
+   - Cross-module wiring, threshold flags, and CLI arguments are tested in `tests/test_token_audit.py`.
+   - Run the complete suite locally with:
+     ```bash
+     python3 -m unittest discover -s tests -p 'test_*.py'
+     ```
+4. **Architectural & Context Hygiene:** Prefer targeted, surgical edits over whole-file rewrites. Preserve architectural boundaries and containment documented in [`docs/architecture.md`](docs/architecture.md) and [`docs/remediation-playbook.md`](docs/remediation-playbook.md).
+5. **Conventional Commits:** Write clear commit messages using the Conventional Commits format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+6. **Security & Privacy:** Strictly zero API keys, secrets, personal emails, or machine-specific absolute paths in code or tests.
+7. **Governance & Metadata Integrity:** Keep project metadata in sync with code updates:
    - Update [`README.md`](README.md) badges if Python support or primary package URLs change.
    - Update [`SECURITY.md`](SECURITY.md) supported versions table and security invariants when architectural or version boundaries shift.
    - Maintain [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/) forms aligned with supported operating systems and AI assistants.
