@@ -67,7 +67,7 @@ The primary goal of Phase 1 is to eliminate invisible, background API calls that
     ```bash
     token-diet --fix-hooks
     ```
-    This automatically creates a backup (`.git/hooks/pre-commit.bak`), comments out unmonitored AI review lines, and preserves executable permissions.
+    This creates an atomic backup (`.git/hooks/pre-commit.bak`) and surgically neutralizes offending AI commands while preserving executable permissions (`chmod +x`): on compound lines (`npm test && claude review`), it replaces only the offending subcommand with `true  # [token-diet disabled: <cmd>]` so surrounding test suites continue executing, while standalone commands are commented out.
   - **Manual Review:**
     Inspect `.git/hooks/pre-commit`:
     ```bash

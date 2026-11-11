@@ -39,11 +39,11 @@ Handles CLI option parsing (`argparse`), path resolution, status determination (
   - Git submodules.
   - Repositories configuring custom hook locations via `core.hooksPath`.
 - **Command Isolation:** Scans `.git/hooks/pre-commit` for known AI/LLM review commands (`claude`, `gemini`, `codex`, `llm`, `aider`, `cody`, etc.) using boundary-aware regex matching.
-- **Surgical Replacement:**
-  - Ignores comments and respects chained shell operators (`&&`, `||`, pipes).
-  - Replaces offending subcommands with `true  # [token-diet disabled: <command>]`, preserving the execution of test runners like `npm test` or `pytest`.
-  - Creates a `.bak` backup before writing.
-  - Preserves executable file permissions (`chmod +x`).
+- **Surgical Neutralization:**
+  - Ignores existing comments and respects chained shell operators (`&&`, `||`, `;`, pipes).
+  - On compound lines, replaces only the offending subcommand with `true  # [token-diet disabled: <command>]`, ensuring test runners (`npm test`, `pytest`) continue executing.
+  - On standalone lines where the entire statement is the AI invocation, comments out the line (`# [token-diet disabled]: <command>`).
+  - Creates an atomic `.bak` backup before writing and preserves executable permissions (`chmod +x`).
 
 ### `mcp_audit.py` — MCP Configuration & Schema Discovery
 - Recursively discovers client configuration files: `opencode.json`, `.mcp.json`, and `mcp.json`.

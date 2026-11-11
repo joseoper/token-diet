@@ -95,7 +95,7 @@ PYTHONPATH=src python3 -m token_diet
 
 ## Auto-Fix Rogue Git Hooks (`--fix-hooks`)
 
-Neutralize unmonitored AI review commands in `.git/hooks/pre-commit` surgically: replaces only the offending subcommand, creates an atomic `.bak` backup, and preserves test runners (`npm test`, `pytest`):
+Neutralize unmonitored AI review commands in `.git/hooks/pre-commit` surgically: replaces offending subcommands on compound lines with `true` (preserving test runners like `npm test` or `pytest`), comments out standalone invocations, creates an atomic `.bak` backup, and preserves executable permissions:
 
 ```bash
 # Preview changes with a colored unified diff:
