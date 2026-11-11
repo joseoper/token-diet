@@ -726,8 +726,8 @@ def main():
 
     # Print Recommendations if bloated
     if summary["alerts"] > 0:
-        print("\n" + red(bold("⚠️  CONTEXT BLOAT DETECTED:")))
-        print("  Files marked [ALERT] exceed 16 KB (>4k tokens) and severely penalize context windows.")
+        print("\n" + red(bold("⚠️  HIGH CONTEXT FOOTPRINT DETECTED:")))
+        print("  Files marked [ALERT] exceed 16 KB (>4k tokens), increasing cache-miss exposure and context footprint.")
         print("  Recommendation: Decouple procedures into On-Demand Skills using the LUT Router pattern.")
     elif summary["warnings"] > 0:
         print("\n" + yellow("ℹ️  MODERATE CONTEXT SIZE:"))

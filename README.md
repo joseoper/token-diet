@@ -9,7 +9,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/joseoper/token-diet/ci.yml?branch=main&label=CI&logo=github&style=flat-square)](https://github.com/joseoper/token-diet/actions)
 [![Release](https://img.shields.io/github/v/release/joseoper/token-diet?style=flat-square&color=blue)](https://github.com/joseoper/token-diet/releases/latest)
 [![Homebrew](https://img.shields.io/badge/homebrew-joseoper%2Ftap-orange?style=flat-square&logo=homebrew)](https://github.com/joseoper/homebrew-tap)
-[![Python](https://img.shields.io/badge/python-3.8%20%7C%203.10--3.13-blue?style=flat-square&logo=python)](pyproject.toml)
+[![Python](https://img.shields.io/badge/python-3.10--3.13-blue?style=flat-square&logo=python)](pyproject.toml)
 [![Dependencies](https://img.shields.io/badge/dependencies-0%20external-success?style=flat-square)](src/token_diet)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blueviolet.svg?style=flat-square)](LICENSE)
 
@@ -27,17 +27,17 @@ Worse, some local developer tools quietly install hidden `pre-commit` hooks that
 
 `token-diet` scans your repository or workstation in milliseconds to:
 - **Audit prompt size:** Flags instruction files that exceed context budgets (`[OK]`, `[WARN]`, `[ALERT]`).
-- **Catch rogue git hooks:** Detects and disables silent LLM review hooks in the active hooks directory (`--fix-hooks`), including linked worktrees, submodules, and repositories using `core.hooksPath`.
+- **Catch rogue git hooks:** Detects and disables known silent AI/LLM review invocations in the active Git pre-commit hook (`--fix-hooks`), including linked worktrees, submodules, and repositories using `core.hooksPath`.
 - **Locate the bloat:** Breaks a Markdown directive down per level-2 heading so you know which section to trim (`--sections`).
 - **Audit MCP overhead:** Reports the context cost of every declared MCP server in `opencode.json`, `.mcp.json`, and `mcp.json` (`--mcp`).
 - **Guard CI pipelines:** Fails PR builds if prompt expansions exceed token thresholds or regress past a saved baseline (`--strict`, `--max-tokens`, `--baseline`, `--max-delta`).
-- **Zero dependencies:** Pure Python standard library (Python >= 3.8). Runs in < 10ms.
+- **Zero dependencies:** Pure Python standard library (Python >= 3.10). Runs in < 10ms.
 
 ### The 6 Vectors of Token Leakage
 
 | Vector | Nature | Status in token-diet | Solution |
 |---|:---:|:---:|---|
-| **1. Global Prompt Bloat** | Static Directives | `[AUDITED]` | Scanned by `token-diet`. Keep root directives < 3 KB (< 750 tokens) and route to on-demand skills. |
+| **1. Global Prompt Bloat** | Static Directives | `[AUDITED]` | Scanned by `token-diet`. Architectural recommendation: root directives < 3 KB (< 750 tokens) routing to on-demand skills. |
 | **2. Invisible Git Hooks** | Execution Leak | `[AUDITED]` | Neutralized with `token-diet --fix-hooks`. Keep commits deterministic; reserve AI reviews for PR CI gates. |
 | **3. Reasoning Effort Inflation** | Config Overrun | `[ADVISORY]` | Guidance in [Playbook §1.3](docs/remediation-playbook.md#13-rationalize-reasoning-effort--multi-agent-spawning). Default reasoning to `medium` or `low`. |
 | **4. Static MCP Schemas** | Injection Floor | `[AUDITED]` | Scanned with `token-diet --mcp`. Prune unused tool servers and enforce lazy-loading. |
@@ -48,7 +48,7 @@ Worse, some local developer tools quietly install hidden `pre-commit` hooks that
 
 ## 2. Real Terminal Audit in Action
 
-Running `token-diet` in your repository delivers an instant, zero-latency diagnostic of your active prompt directives and git hook security:
+Running `token-diet` in your repository delivers an instant diagnostic with zero runtime LLM overhead across your active prompt directives and git hook security:
 
 ![Token Diet Real Terminal Audit](assets/terminal_preview.png)
 
@@ -56,9 +56,9 @@ Running `token-diet` in your repository delivers an instant, zero-latency diagno
 
 | Indicator | Byte Threshold | Estimated Tokens | What it Means & Recommended Action |
 |---|:---:|:---:|---|
-| 🟢 `[OK]` | `< 4 KB` | `< 1,000 tokens` | **Optimal Context:** Ultra-lean static directive: leaves maximum headroom for codebase context while minimizing cache-miss re-ingestion costs. |
-| 🟡 `[WARN]` | `4 KB – 16 KB` | `1,000 – 4,000 tokens` | **Moderate Size:** Acceptable, but review for duplicate instructions or unneeded verbosity. |
-| 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **Severe Prompt Bloat:** Monolithic rules degrade reasoning and waste context budget every turn. Decouple into On-Demand Skills. |
+| 🟢 `[OK]` | `< 4 KB` | `< 1,000 tokens` | **Low Footprint:** Lean static directive: leaves maximum headroom for codebase context while minimizing cache-miss re-ingestion costs. |
+| 🟡 `[WARN]` | `4 KB – 16 KB` | `1,000 – 4,000 tokens` | **Moderate Footprint:** Acceptable, but consider moving specialized procedures into on-demand skills. |
+| 🔴 `[ALERT]` | `> 16 KB` | `> 4,000 tokens` | **High Footprint:** Monolithic rules risk diluting attention and increasing cache-miss exposure. Recommended: decouple into On-Demand Skills. |
 | 🚨 `[HOOK ALERT]` | — | — | **Hidden Token Bleed:** The active `pre-commit` hook sends code to cloud LLMs on every `git commit`. Replace with static linters. |
 
 ---
@@ -112,7 +112,7 @@ flowchart LR
 | **Audit** | Static inspection of filesystem artifacts: prompt directives (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`), global workstation defaults (`--global`), declared MCP tool schemas (`--mcp`), and heading breakdowns (`--sections`). | Complete inventory of base token injection costs per turn before execution. |
 | **Detect** | Heuristic evaluation identifying oversized monolithic rules (> 16 KB / > 4,000 tokens) and irregular git hooks in `.git/hooks/pre-commit` or `core.hooksPath` running silent AI reviews. | Instant visual flags (`[WARN]`, `[ALERT]`, `🚨 IRREGULAR HOOK DETECTED`) pointing to the exact line and file. |
 | **Enforce** | Deterministic quality gates for CI pipelines and pre-commit checks: strict limits (`--strict`), hard token ceilings (`--max-tokens <N>`), and baseline regression budgets (`--baseline`, `--max-delta <%>`). | Blocks PRs and commits that introduce unbudgeted prompt expansion or creeping regressions. |
-| **Recommend** | Architectural solutions and runtime practices: the Look-Up Table (LUT) Router pattern, on-demand skill decoupling (`skills/<name>/SKILL.md`), and in-session execution hygiene. | Drops static base tokens by 91% while preserves rule accessibility on-demand without cognitive clutter. |
+| **Recommend** | Architectural solutions and runtime practices: the Look-Up Table (LUT) Router pattern, on-demand skill decoupling (`skills/<name>/SKILL.md`), and in-session execution hygiene. | Projected base context reduction of ~91% while preserving rule accessibility on-demand without cognitive clutter. |
 
 ---
 
@@ -131,9 +131,9 @@ Most LLM optimization tooling operates downstream at runtime—proxying HTTP tra
 | **Operating Layer** | Network / API Proxy | Model Inference / Runtime Middleware | **Local Filesystem & CI/CD Pipeline** |
 | **Inspection Scope** | Outgoing API request payloads | Raw text prompt strings | **Directives (`AGENTS.md`), MCP configs, Git hooks** |
 | **Execution Point** | After prompt is assembled & sent | During prompt assembly | **Pre-flight (Pre-commit, CI, local CLI)** |
-| **Runtime Overhead** | Proxy network latency | CPU/GPU inference latency (small LM) | **Zero (pure Python stdlib, < 10 ms)** |
+| **Runtime Overhead** | Proxy network latency | CPU/GPU inference latency (small LM) | **Zero runtime LLM overhead (pure Python stdlib, < 10 ms local CLI)** |
 | **Code & Syntax Safety** | Transparent passthrough | Risk of AST, indentation, or syntax corruption | **Deterministic, zero-hallucination static filesystem analysis (code safe, leaves application logic untouched)** |
-| **Hook & MCP Visibility** | ❌ Blind to local git hooks & MCP configs | ❌ Blind to local git hooks & MCP configs | **✅ Full audit of hooks & declared MCP schemas** |
+| **Hook & MCP Visibility** | ❌ Blind to local git hooks & MCP configs | ❌ Blind to local git hooks & MCP configs | **✅ Audits active Git pre-commit hook & declared MCP schemas** |
 | **CI Budget Enforcement** | ❌ Reactive billing alerts | ❌ No CI pipeline enforcement | **✅ Strict thresholds, baselines, and delta gates** |
 
 * **Runtime Gateways (LiteLLM, Portkey):** Handle API routing, multi-provider fallbacks, and centralized usage logging. However, they are completely blind to uncommitted local directives, invisible `.git/hooks/pre-commit` scripts, or workstation-wide prompt bloat. By the time a gateway sees the payload, the tokens have already been loaded, serialized, and billed.
@@ -180,27 +180,28 @@ Even when prefixes are kept strictly immutable, monolithic prompts inflict sever
 
 ### Simulated 20-Turn Session Model: Monolithic Directives vs. Token Diet LUT Router
 
-Below is a simulated 20-turn session model measuring base context consumption and memory retention across a standard 20-turn agent coding session (without synthetic pricing estimates—strictly token quantities and usable memory share):
+Below is a simulated 20-turn session model measuring base context consumption across a standard 20-turn agent coding workflow (comparing raw token exposure and static instruction footprint, without synthetic billing claims):
 
 ![Token Footprint & Context Retention Benchmark](assets/context_benchmark_chart.jpg)
 
-### Token Footprint & Context Retention Comparison
+### Projected Base Context Reduction: 91%
 
 | Metric | Monolithic Directives (No Diet) | With Token Diet (LUT Router) | Impact / Gain |
 |---|:---:|:---:|:---:|
-| **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base tokens** |
-| **Cumulative Ingestion (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens spared** |
-| **Boilerplate Context Share** | **~75%** of base context | **< 8%** of base context | **-67% static context footprint** |
-| **Active Context Headroom for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% freed working headroom** |
-| **Cache Miss Re-ingestion Penalty** | 8,400 tokens / miss | 750 tokens / miss | **-91% penalty exposure** |
-| **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
+| **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base static overhead** |
+| **Cumulative Attention Load (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens exposed** |
+| **Static Directive Footprint** | ~8,400 tokens / turn | ~750 tokens / turn | **-91% static footprint** |
+| **Share of Initial Working Context (~11k tokens)** | **~75%** static guidelines | **< 8%** static guidelines | **+67% initial working capacity freed** |
+| **Cache Miss Re-ingestion Exposure** | 8,400 tokens / miss | 750 tokens / miss | **-91% re-ingestion risk** |
+| **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes instruction dilution & Lost-in-the-Middle retrieval degradation** |
 
 > [!NOTE] **Methodological Framework & Model Parameters**
 > - **Token Estimation Heuristic:** Based on the standard `cl100k_base` / `o200k_base` estimation heuristic (~4 characters/bytes per token for structured Markdown/prose).
-> - **Session Dynamics:** Models a standard 20-turn active coding workflow where the monolithic directive (~8,400 tokens) is re-ingested into context on every turn versus the LUT Router (base ~750 tokens + ~1,200 tokens during turns where specialized domain skills are loaded on demand, modeled in ~25% of turns).
-> - **Reference Context Window:** Calibrated against standard 128k/200k active context windows (e.g., Claude 3.5 Sonnet, GPT-4o, Gemini 1.5/2.0), demonstrating how the LUT Router frees working memory for code context, test outputs, and compiler diagnostics rather than static boilerplate.
+> - **Projected Base Context Reduction (91%):** Mathematical reduction calculated strictly on the static prompt baseline: `1 - (750 / 8,400) = 91.07%`. It represents the reduction of persistent instructional overhead injected into each turn, not a guaranteed flat discount on the final API invoice.
+> - **Cumulative Attention Load vs. Billed Tokens:** The ~168,000 tokens represent gross cumulative exposure to the model's attention window across 20 turns. Under modern prompt caching, warm cache hits are billed at reduced rates; however, cache misses (upon TTL expiry or cache eviction) and attention dilution remain directly proportional to static prompt size.
+> - **Initial Turn Context Share:** In a typical turn-1 payload (~11,200 tokens total: base directives + initial code/task description), an 8,400-token monolithic file consumes ~75% of that initial context payload. With the LUT Router (~750 tokens), static boilerplate occupies less than 8%, leaving over 92% of the initial prompt capacity available for source code, test failures, and compiler diagnostics.
 
-*In a monolithic configuration, ~75% of your conversational context is permanently consumed by idle guidelines that never get used during the session. With Token Diet's LUT Router, 92%+ of your context remains dedicated to actual source code, test failures, and reasoning.*
+*In a monolithic configuration, ~75% of your early conversational context payload is consumed by idle guidelines that never get used during the session. With Token Diet's LUT Router, over 92% of early context and persistent working memory remains dedicated to actual source code, test failures, and reasoning.*
 
 ---
 
@@ -343,7 +344,7 @@ When `token-diet` flags an irregularity, follow the corresponding action path (d
 * **Problem:** A root instruction file (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`) exceeds 16 KB (> 4,000 tokens), inflicts severe cache-miss penalties upon 5-min TTL expiration and starves active context window.
 * **Action Path (The Look-Up Table / LUT Router Pattern):**
   1. **Extract Specialized Protocols:** Move detailed procedure manuals, test specifications, and review arbitrations into standalone on-demand skills (e.g., `skills/<skill-name>/SKILL.md`).
-  2. **Compress Root Directive:** Keep only core behavioral invariants and a routing index in the root file (< 3 KB / < 750 tokens):
+  2. **Compress Root Directive:** Keep only core behavioral invariants and a routing index in the root file (architectural heuristic: target < 3–4 KB / < 750–1,000 tokens):
      ```markdown
      ## On-Demand Skills
      - When running database migrations, read `skills/db-migrate/SKILL.md`.
@@ -363,7 +364,7 @@ When `token-diet` flags an irregularity, follow the corresponding action path (d
 To have your AI coding assistant (Claude Code, Gemini CLI, Cursor, Windsurf, OpenCode) remediate prompt bloat autonomously without manual edits, copy and paste this prompt:
 
 ```text
-Run `token-diet` in this repository. If you detect any files marked [ALERT] or [WARN], follow `docs/remediation-playbook.md` to decouple operational procedures into on-demand skills under `skills/<skill-name>/SKILL.md`. Compress the root instruction file to a concise Look-Up Table (LUT Router) under 3 KB (< 750 tokens). If an irregular hook is flagged, run `token-diet --fix-hooks`. Verify that all tests pass and `token-diet` reports [OK].
+Run `token-diet` in this repository. If you detect any files marked [ALERT] or [WARN], follow `docs/remediation-playbook.md` to decouple operational procedures into on-demand skills under `skills/<skill-name>/SKILL.md`. Compress the root instruction file to a concise Look-Up Table (LUT Router) targeting under ~3 KB (< 750 tokens). If an irregular hook is flagged, run `token-diet --fix-hooks`. Verify that all tests pass and `token-diet` reports [OK].
 ```
 
 ---
@@ -384,13 +385,13 @@ To maintain zero runtime dependencies and millisecond-level execution, `token-di
 ### Technical FAQ
 
 #### Q: If frontier models offer prompt caching discounts, why does static prompt bloat matter?
-**A:** Because prompt cache discounts only apply while the cache entry is warm. In Anthropic, prompt cache entries expire after **5 minutes of developer pause**; in OpenAI, cache blocks are evicted dynamically under memory pressure. When TTL expires or you switch tasks, you pay 100% full price on every token. Furthermore, cached tokens still subtract from your model's active attention window on every single turn, aggravating attention dilution (*Lost in the Middle*).
+**A:** Because prompt cache discounts only apply while the cache entry is warm. In Anthropic, prompt cache entries expire after **5 minutes of developer pause**; in OpenAI, cache blocks are evicted dynamically under memory pressure. When TTL expires or cache is evicted, input tokens must be re-ingested at full non-cached rates. Furthermore, cached tokens still subtract from your model's active attention window on every single turn, aggravating attention dilution (*Lost in the Middle*).
 
 #### Q: Does token size matter if my model has a 1M or 2M token context window?
 **A:** Yes. Context window capacity is not synonymous with effective working memory. As prompt context grows, LLM reasoning latency rises and attention degrades across long documents. In addition, API pricing is charged on every single turn: processing 25 KB of monolithic guidelines across 30 turns generates hundreds of thousands of unnecessary input tokens.
 
 #### Q: Why not use runtime API proxies or prompt text compressors instead?
-**A:** Runtime proxies (LiteLLM, Portkey) operate after tokens have already been read from disk and serialized, and they are completely blind to local git hooks or MCP schema definitions. Runtime compressors (LLMLingua) add model latency and risk corrupting code syntax, indentation, and architectural constraints. `token-diet` is a zero-latency, zero-dependency static linter operating directly on the filesystem before tokens are sent.
+**A:** Runtime proxies (LiteLLM, Portkey) operate after tokens have already been read from disk and serialized, and they are completely blind to local git hooks or MCP schema definitions. Runtime compressors (LLMLingua) add model latency and risk corrupting code syntax, indentation, and architectural constraints. `token-diet` is a zero-dependency static linter operating directly on the filesystem with zero runtime LLM overhead before tokens are sent.
 
 #### Q: How does `--fix-hooks` ensure safety when modifying git hooks?
 **A:** `--fix-hooks` never destroys code. It creates an atomic `.bak` backup file before modifying anything, isolates unmonitored AI review commands using boundary-aware regex matching, and preserves executable permissions on the active hook script.
@@ -455,7 +456,7 @@ token-diet/
 ### Platform Compatibility
 
 Token Diet is OS-agnostic and cross-platform:
-- **CLI Diagnostic Tool:** Pure Python standard library with zero third-party dependencies. Runs seamlessly on **macOS**, **Linux**, and **Windows** (Python >= 3.8).
+- **CLI Diagnostic Tool:** Pure Python standard library with zero third-party dependencies. Runs seamlessly on **macOS**, **Linux**, and **Windows** (Python >= 3.10).
 - **Universal Methodology:** Core principles apply across all assistants (Claude Code, Gemini CLI, OpenAI Codex, OpenCode, Cursor, Windsurf).
 
 ### Documentation & Guides

@@ -81,7 +81,7 @@ The primary goal of Phase 1 is to eliminate invisible, background API calls that
   Inspect client settings files and remove or comment out automated review commands attached to `Stop` or `UserPromptSubmit` events.
 
 ### 1.3 Rationalize Reasoning Effort & Multi-Agent Spawning
-* **Problem:** Setting `model_reasoning_effort = "high"` on reasoning models generates thousands of hidden chain-of-thought tokens on trivial syntax or file inspection tasks. Unsupervised multi-agent settings (`max_threads > 1`) multiply this burn across parallel processes.
+* **Problem:** Setting `model_reasoning_effort = "high"` on reasoning models can generate thousands of hidden chain-of-thought tokens even for routine syntax checks, depending on the model, provider architecture, and task complexity. Unsupervised multi-agent settings (`max_threads > 1`) multiply this burn across parallel processes.
 * **Remediation:**
   - Default reasoning effort to `low` or `medium` for routine coding.
   - Reserve `high` reasoning effort for complex algorithmic architecture tasks under explicit user command.
@@ -91,7 +91,7 @@ The primary goal of Phase 1 is to eliminate invisible, background API calls that
 
 ## Phase 2: Prompt Diet & The Look-Up Table (LUT) Router Pattern
 
-The goal of Phase 2 is to reduce static baseline context from **~8,400 base tokens per turn down to < 750 tokens**, preserving over 92% of working context memory for code and reasoning.
+The goal of Phase 2 is to achieve a **Projected Base Context Reduction of ~91%**, reducing static baseline context from **~8,400 base tokens per turn down to < 750 tokens**, preserving over 92% of initial working context memory for code and reasoning.
 
 ### 2.1 The Technical Reality of Prompt Caching & The Cost of Bloat
 
@@ -117,7 +117,7 @@ A static, long prompt **does NOT fail cache eligibility by itself**. As long as 
 
 #### 2. The True Operational Cost of Bloat
 Even when cache hits occur, monolithic prompts create severe operational bottlenecks:
-* **The Cache Miss / TTL Expiry Penalty:** Cache entries are ephemeral. In Anthropic, prompt cache TTL is typically **5 minutes of developer pause**; in OpenAI, cache chunks are evicted under memory pressure. When TTL expires or a cache miss occurs, the developer pays **100% of the standard input rate** across 25+ KB (~6,000–8,400 tokens) of instructions on every single turn.
+* **The Cache Miss / TTL Expiry Exposure:** Cache entries are ephemeral. In Anthropic, prompt cache TTL is typically **5 minutes of developer pause**; in OpenAI, cache chunks are evicted under memory pressure. When TTL expires or cache is evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
 * **Context Window Starvation:** Cache hit or miss, **cached tokens consume active context window capacity**. 8,400 tokens of static rules permanently rob the model of active attention on every turn.
 * **Reasoning Dilution ("Needle-in-a-Haystack" Failure):** Drowning the model in 25 KB of monolithic guidelines dilutes attention. Frontier models suffer retrieval and instruction-following degradation when key constraints are buried in pages of irrelevant protocols.
 
@@ -127,25 +127,28 @@ Below is a simulated 20-turn session model comparing base context consumption an
 
 ![Context Benchmark Chart](../assets/context_benchmark_chart.jpg)
 
+### Projected Base Context Reduction: 91%
+
 | Metric | Monolithic Directives (No Diet) | With Token Diet (LUT Router) | Impact / Gain |
 |---|:---:|:---:|:---:|
-| **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base tokens** |
-| **Cumulative Ingestion (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens spared** |
-| **Boilerplate Context Share** | **~75%** of base context | **< 8%** of base context | **-67% static context footprint** |
-| **Active Context Headroom for Code & Reasoning** | **~25%** (Heavily constrained) | **> 92%** (Abundant capacity) | **+70% freed working headroom** |
-| **Cache Miss Re-ingestion Penalty** | 8,400 tokens / miss | 750 tokens / miss | **-91% penalty exposure** |
+| **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base static overhead** |
+| **Cumulative Attention Load (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens exposed** |
+| **Static Directive Footprint** | ~8,400 tokens / turn | ~750 tokens / turn | **-91% static footprint** |
+| **Share of Initial Working Context (~11k tokens)** | **~75%** static guidelines | **< 8%** static guidelines | **+67% initial working capacity freed** |
+| **Cache Miss Re-ingestion Exposure** | 8,400 tokens / miss | 750 tokens / miss | **-91% re-ingestion risk** |
 | **Attention Focus & Retrieval Accuracy** | High risk of instruction dilution | Laser-focused on active task | **Minimizes attention dilution & Lost-in-the-Middle retrieval degradation** |
 
 > [!NOTE] **Methodological Framework & Model Parameters**
 > - **Token Estimation Heuristic:** Based on the standard `cl100k_base` heuristic (~4 characters/bytes per token for structured Markdown/prose).
-> - **Session Dynamics:** Models a standard 20-turn active coding workflow where the monolithic directive (~8,400 tokens) is re-ingested into context on every turn versus the LUT Router (base ~750 tokens + ~1,200 tokens during turns where specialized domain skills are loaded on demand).
-> - **Reference Context Window:** Calibrated against standard active context windows (e.g., 128k/200k tokens), demonstrating how the LUT Router frees working memory for code context and compiler diagnostics rather than static boilerplate.
+> - **Projected Base Context Reduction (91%):** Mathematical reduction calculated strictly on the static prompt baseline: `1 - (750 / 8,400) = 91.07%`. It represents the reduction of persistent instructional overhead injected into each turn, not a guaranteed flat discount on the final API invoice.
+> - **Cumulative Attention Load vs. Billed Tokens:** The ~168,000 tokens represent gross cumulative exposure to the model's attention window across 20 turns. Under modern prompt caching, warm cache hits are billed at reduced rates; however, cache misses (upon TTL expiry or cache eviction) and attention dilution remain directly proportional to static prompt size.
+> - **Initial Turn Context Share:** In a typical turn-1 payload (~11,200 tokens total: base directives + initial code/task description), an 8,400-token monolithic file consumes ~75% of that initial context payload. With the LUT Router (~750 tokens), static boilerplate occupies less than 8%, leaving over 92% of the initial prompt capacity available for source code, test failures, and compiler diagnostics.
 
-*In a monolithic setup, ~75% of your conversational memory is permanently consumed by idle instructions that are never executed in the session. Token Diet's LUT Router preserves > 92% of working memory for actual code, AST analysis, and compiler feedback.*
+*In a monolithic setup, ~75% of your early conversational payload is consumed by idle instructions that are never executed in the session. Token Diet's LUT Router preserves > 92% of working memory for actual code, AST analysis, and compiler feedback.*
 
 ### 2.3 The Look-Up Table (LUT) Router Pattern
 Instead of placing full operational manuals inline, transform root directive files into a **Look-Up Table (LUT) Router**:
-1. Keep only core behavioral invariants in the root file (< 50 lines / < 3 KB / < 750 tokens):
+1. Keep only core behavioral invariants in the root file (architectural heuristic: target < 50 lines / < 3–4 KB / < 750–1,000 tokens):
    - Language and code formatting preferences.
    - Commitment to test-driven development (TDD).
    - Prohibition of hallucinated citations and unverified statements.
@@ -165,9 +168,9 @@ Instead of placing full operational manuals inline, transform root directive fil
 ## Phase 3: Tooling, MCP Schemas & Daemon Governance
 
 ### 3.1 Prune Oversized MCP Server Schemas
-* Every active MCP server serializes its entire JSON parameter schema into the system prompt on every request.
-* Registering 4–5 servers with dozens of tools adds 15,000–25,000 tokens of fixed overhead.
-* **Action:** Disable unused MCP servers in client configuration files. Enable lazy-loading tool discovery when supported by your client.
+* Depending on client architecture and whether tool discovery is static or dynamic, active MCP servers may serialize their entire JSON parameter schemas into the system prompt on each request.
+* When multiple servers with dozens of tools are registered, this introduces a fixed token floor before user input is processed.
+* **Action:** Disable unused MCP servers in client configuration files. Leverage lazy-loading tool discovery when supported by your client environment.
 
 ### 3.2 Terminate Orphaned Processes
 * Background tool processes (e.g., language servers, code indexing watchdogs) can linger after sessions close, consuming system resources and holding network ports open.
