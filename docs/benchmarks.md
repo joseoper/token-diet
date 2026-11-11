@@ -18,8 +18,8 @@ This structural bloat imposes three operational penalties:
 ## 2. Simulated 20-Turn Session Model
 
 To evaluate the operational impact of prompt architecture, we model a standard 20-turn active software engineering session comparing two configurations:
-* **Monolithic Directive (No Diet):** A single 25 KB instruction file (~8,400 tokens) loaded into context on every turn.
-* **With Token Diet (LUT Router Pattern):** A compressed root directive (~750 tokens) containing core invariants and a Look-Up Table routing to specialized domain skills on demand (modeled as loading an additional ~1,200 tokens during ~25% of turns).
+* **Monolithic Directive (No Diet):** A single 25 KB instruction file (~8,400 tokens) loaded statically into context on every turn.
+* **With Token Diet (LUT Router Pattern):** A compressed root directive (~750 tokens) containing core invariants and a Look-Up Table. Specialized domain skills (~1,200 tokens) are loaded strictly on demand during turns requiring specialized procedures (modeled in ~25% of turns, i.e., 5 of 20 turns).
 
 ![Token Footprint & Context Retention Benchmark](../assets/context_benchmark_chart.jpg)
 
@@ -27,8 +27,10 @@ To evaluate the operational impact of prompt architecture, we model a standard 2
 
 | Metric | Monolithic Directives (No Diet) | With Token Diet (LUT Router) | Impact / Gain |
 |---|:---:|:---:|:---:|
-| **Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base static overhead** |
-| **Cumulative Attention Load (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 tokens exposed** |
+| **Static Base Overhead per Turn** | ~8,400 tokens | ~750 tokens | **-91% base static overhead** |
+| **Cumulative Static Ingestion (20 Turns)** | ~168,000 tokens | ~15,000 tokens | **-153,000 static tokens spared** |
+| **On-Demand Skills Ingestion (5 Turns @ 1.2k)** | Included in monolith | ~6,000 tokens | Loaded strictly when needed |
+| **Total Instructional Attention Load (20 Turns)** | ~168,000 tokens | **~21,000 tokens** | **-147,000 tokens exposed (-87.5%)** |
 | **Static Directive Footprint** | ~8,400 tokens / turn | ~750 tokens / turn | **-91% static footprint** |
 | **Share of Initial Working Context (~11k tokens)** | **~75%** static guidelines | **< 8%** static guidelines | **+67% initial working capacity freed** |
 | **Cache Miss Re-ingestion Exposure** | 8,400 tokens / miss | 750 tokens / miss | **-91% re-ingestion risk** |
@@ -40,7 +42,11 @@ To evaluate the operational impact of prompt architecture, we model a standard 2
 * **Projected Base Context Reduction (91%):** Mathematical reduction calculated strictly on the static prompt baseline:
   $$\text{Reduction} = 1 - \frac{750}{8,400} = 91.07\%$$
   It measures the reduction of persistent instructional overhead injected into each turn, rather than a guaranteed flat discount on the final API invoice.
-* **Cumulative Attention Load vs. Billed Tokens:** The ~168,000 tokens represent gross cumulative exposure to the model's attention window across 20 turns. Under modern prompt caching, warm cache hits are billed at reduced rates; however, cache misses (upon TTL expiry or cache eviction) and attention dilution remain directly proportional to static prompt size.
+* **Accounting for Static Base vs. On-Demand Skills:**
+  - **Static Base Ingestion:** Over 20 turns, the persistent router preamble accounts for $750 \times 20 = 15,000$ tokens (versus $8,400 \times 20 = 168,000$ tokens in the monolith, a 91% static reduction).
+  - **Dynamic On-Demand Skills:** When specialized tasks arise (modeled in 25% of turns, or 5 turns), an on-demand skill (~1,200 tokens) is loaded, adding $1,200 \times 5 = 6,000$ tokens.
+  - **Total Session Attention Load:** Summing base router ($15,000$) + on-demand skills ($6,000$) yields **$21,000$ total instruction tokens** across the 20-turn session—still representing a net **87.5% reduction** (-147,000 tokens) compared to the 168,000 tokens of persistent monolithic exposure.
+* **Cumulative Attention Load vs. Billed Tokens:** The 168,000 tokens (monolith) vs. 21,000 tokens (LUT Router) represent gross cumulative exposure to the model's attention window across 20 turns. Under modern prompt caching, warm cache hits are billed at reduced rates; however, cache misses (upon TTL expiry or cache eviction) and attention dilution remain directly proportional to static prompt size.
 * **Initial Turn Context Share:** In a typical turn-1 payload (~11,200 tokens total: base directives + initial code/task description), an 8,400-token monolithic file consumes ~75% of that initial context payload. With the LUT Router (~750 tokens), static boilerplate occupies less than 8%, leaving over 92% of the initial prompt capacity available for source code, test failures, and compiler diagnostics.
 
 ---
