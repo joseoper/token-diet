@@ -71,11 +71,19 @@ What actually invalidates prompt caching is **modifying the prefix or injecting 
 2. Modifying even a single character in the system prompt or introductory directives.
 3. Swapping tool schemas or re-ordering MCP declarations before the instruction block.
 
-### The Real Cost of Bloat
-Even when prefixes are kept strictly immutable, monolithic prompts inflict severe operational damage:
-* **The Cache Miss Penalty:** Cache entries are ephemeral. In Anthropic, prompt cache blocks have a **5-minute default TTL that refreshes with each subsequent query hitting the cache**, while in OpenAI, cached prefix blocks are evicted dynamically based on server load and memory pressure. If the session is paused long enough for the TTL to expire or if cache blocks are evicted, the developer must re-ingest the full 25+ KB (~6,000–8,400 tokens) of instructions at standard non-cached input rates.
+### The Real Cost of Bloat & Provider Cache Dynamics
+
+Cache retention policies, eviction models, and minimum thresholds vary significantly by provider and caching architecture:
+
+* **[Anthropic Prompt Caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching):** Standard ephemeral cache blocks (`cache_control: {"type": "ephemeral"}`) carry a **5-minute default TTL that refreshes with each subsequent query hitting the cache**, subject to minimum token thresholds (1,024 tokens for Claude 3.5 Sonnet/Opus, 2,048 for Haiku) and provider capacity. Extended retention or custom cache lifetimes depend on tier-specific configuration.
+* **[OpenAI Prompt Caching](https://platform.openai.com/docs/guides/prompt-caching):** Operates automatically on prefixes of 1,024+ tokens with no developer-configured TTL parameter. Eviction is managed dynamically according to cluster load and least-recently-used (LRU) memory pressure (typically lasting 5–10 minutes during active dialog, and up to an hour during low traffic).
+* **[Google Gemini Context Caching](https://ai.google.dev/gemini-api/docs/caching):** Implements explicit cache objects with user-configurable TTLs (default 1 hour, customizable via expiration timestamps) targeted at large contexts (≥ 32,768 tokens).
+
+Even when prefixes remain byte-identical and hit warm caches, monolithic instruction files inflict severe operational penalties:
+
+* **Cache Miss & Eviction Exposure:** Because cache retention is ephemeral and subject to provider memory management, cache misses inevitably occur across working pauses, branching, and context switches. Whenever a cache entry expires or is evicted, the full monolithic payload (e.g., 25+ KB / ~6,000–8,400 tokens) must be re-ingested at standard non-cached input rates.
 * **Working Context Constriction:** Cache hit or miss, **cached tokens still occupy active context window capacity**. An 8,400-token static prompt permanently subtracts 8,400 tokens from the model's available working memory on *every single turn*.
-* **Instruction Noise & Search Space:** Forcing 25 KB of monolithic guidelines into context increases prompt clutter with non-applicable rules. Decoupling into on-demand skills ensures that only guidelines pertinent to the active task occupy the prompt, aiding retrieval of relevant instructions.
+* **Instruction Clutter & Search Space:** Forcing 25 KB of monolithic guidelines into context increases prompt clutter with non-applicable rules. Decoupling into on-demand skills ensures that only guidelines pertinent to the active task occupy the prompt, aiding retrieval of relevant instructions.
 
 ---
 
