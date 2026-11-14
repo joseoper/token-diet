@@ -703,7 +703,7 @@ class TestRemediationT5(unittest.TestCase):
                 f.write("#!/bin/sh\nclaude review\n")
             with open(hook + ".bak", "w") as f:
                 f.write("old")
-            code, out, err = self._run(["--fix-hooks"], cwd=tmp)
+            code, out, err = self._run(["--fix-hooks", "-y"], cwd=tmp)
             self.assertEqual(code, 1)
 
     def test_fix_hooks_noop_exits_0(self):

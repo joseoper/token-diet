@@ -96,7 +96,7 @@ Even when prefixes remain byte-identical and hit warm caches, monolithic instruc
 | **Operating Layer** | Network / API Proxy | Model Inference / Runtime Middleware | **Local Filesystem & CI/CD Pipeline** |
 | **Inspection Scope** | Outgoing API request payloads | Raw text prompt strings | **Directives (`AGENTS.md`), MCP configs, Git hooks** |
 | **Execution Point** | After prompt is assembled & sent | During prompt assembly | **Pre-flight (Pre-commit, CI, local CLI)** |
-| **Runtime Overhead** | Proxy network latency | CPU/GPU inference latency (small LM) | **Zero runtime LLM overhead (pure Python stdlib, < 10 ms local CLI)** |
+| **Runtime Overhead** | Proxy network latency | CPU/GPU inference latency (small LM) | **Zero runtime LLM overhead (pure Python stdlib, deterministic offline CLI)** |
 | **Code & Syntax Safety** | Transparent passthrough | Risk of AST, indentation, or syntax corruption | **Deterministic, zero-hallucination static filesystem analysis** |
 | **Hook & MCP Visibility** | ❌ Blind to local git hooks & MCP configs | ❌ Blind to local git hooks & MCP configs | **✅ Audits active Git pre-commit hook & declared MCP schemas** |
 | **CI Budget Enforcement** | ❌ Reactive billing alerts | ❌ No CI pipeline enforcement | **✅ Strict thresholds, baselines, and delta gates** |
