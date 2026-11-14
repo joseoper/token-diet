@@ -10,20 +10,37 @@ import os
 import re
 from typing import List, Optional, Tuple
 
-AI_HOOK_KEYWORDS = ["gga", "opencode", "gentle-ai", "claude", "gemini", "ollama", "llm review"]
+AI_HOOK_KEYWORDS = [
+    "gga",
+    "opencode",
+    "gentle-ai",
+    "claude",
+    "gemini",
+    "ollama",
+    "codex",
+    "aider",
+    "cody",
+    "llm review",
+    "llm",
+]
 
 # Shell control operators that delimit independent subcommands on a single line.
 # Command substitutions (``$(``), subshells (``(``/``)``), backticks, list
 # separators (``;``, ``&&``, ``||``, ``;;``) and pipes all start a new command.
 _SEPARATOR_RE = re.compile(r"&&|\|\||\$\(|;;|[;|&()`]")
 
-# Bounded keyword patterns: reject matches glued to an identifier/hyphen before,
-# and to a word/path/extension character after (so ``./claude`` counts while
-# ``.json`` and ``.py`` suffixes do not).
-_AI_KEYWORD_PATTERNS = {
-    kw: re.compile(r"(?<![\w\-])" + re.escape(kw) + r"(?![\w\-\.\/])")
-    for kw in AI_HOOK_KEYWORDS
-}
+# Wrapper commands execute the rest of the argv as the real command, so a
+# keyword after one of them still runs. Detection must look past them.
+_WRAPPER_COMMANDS = frozenset(
+    {"sudo", "env", "command", "exec", "xargs", "time", "nohup", "nice"}
+)
+
+# Shell reserved words that can directly precede a command in a compound statement.
+_SHELL_PREFIX_WORDS = frozenset({"if", "then", "elif", "else", "do", "while", "until", "!", "{", "}"})
+
+# Leading ``NAME=value`` environment assignments (``FOO=1 claude review``).
+_ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_TOKEN_RE = re.compile(r"\S+")
 
 _DISABLED_PREFIX = "# [token-diet disabled]"
 _DISABLED_INLINE_MARKER = "# [token-diet disabled: {commands}]"
@@ -227,36 +244,68 @@ def _subcommand_spans(line: str) -> List[Tuple[int, int]]:
 
 
 def _should_skip_subcommand(subcmd: str) -> bool:
-    """Returns True for subcommands that never execute AI tooling (echo, assignments)."""
+    """Returns True for subcommands that never execute AI tooling (echo, printf)."""
     tokens = subcmd.split()
     if not tokens:
         return True
-    first_token = tokens[0].lower()
-    if first_token in ("echo", "printf"):
-        return True
-    # Skip pure variable assignments like FOO=12 or export PATH=...
-    if "=" in first_token and not (first_token.startswith("exec") or first_token.startswith("env")):
-        return True
-    if first_token == "export" and len(tokens) > 1 and "=" in tokens[1]:
-        return True
-    return False
+    return tokens[0].lower() in ("echo", "printf")
 
 
-def _subcommand_keyword_matches(subcmd: str) -> List[str]:
-    """Returns AI keywords invoked inside a single subcommand, in AI_HOOK_KEYWORDS order."""
-    lower_subcmd = subcmd.lower()
-    return [kw for kw in AI_HOOK_KEYWORDS if _AI_KEYWORD_PATTERNS[kw].search(lower_subcmd)]
+def _basename(token: str) -> str:
+    """Returns a lowercased token with any leading directory part removed."""
+    return token.rsplit("/", 1)[-1].lower()
 
 
-def _first_keyword_offset(subcmd: str, keywords: List[str]) -> int:
-    """Returns the offset of the earliest AI keyword match within a subcommand, or -1."""
-    lower_subcmd = subcmd.lower()
-    best = -1
-    for kw in keywords:
-        match = _AI_KEYWORD_PATTERNS[kw].search(lower_subcmd)
-        if match and (best == -1 or match.start() < best):
-            best = match.start()
-    return best
+def _command_word_matches(words: List[Tuple[int, str]], index: int, keyword: str) -> bool:
+    """Returns True when ``keyword`` (one or more words) matches the command starting at ``index``."""
+    parts = keyword.split()
+    if index + len(parts) > len(words):
+        return False
+    return all(_basename(words[index + i][1]) == part for i, part in enumerate(parts))
+
+
+def _locate_command_keyword(subcmd: str) -> Optional[Tuple[int, List[str]]]:
+    """
+    Returns ``(offset, keywords)`` for a keyword used as the command word of a
+    subcommand, or ``None`` when no keyword runs.
+
+    A keyword only counts at command position: as ``argv[0]``, after leading
+    ``NAME=value`` environment assignments, or after wrapper commands
+    (``sudo``/``env``/``xargs``/...). Keywords used as plain arguments
+    (``grep -r claude docs``) are not invocations, so ``--fix-hooks`` never
+    rewrites them.
+    """
+    words = [(match.start(), match.group()) for match in _TOKEN_RE.finditer(subcmd)]
+    index = 0
+    while index < len(words):
+        token = words[index][1]
+        if (
+            _ENV_ASSIGNMENT_RE.match(token)
+            or token.startswith("-")
+            or token.isdigit()
+            or _basename(token) in _WRAPPER_COMMANDS
+            or _basename(token) in _SHELL_PREFIX_WORDS
+        ):
+            index += 1
+            continue
+        break
+
+    if index >= len(words):
+        return None
+
+    # Prefer the most specific match: the "llm review" phrase over bare "llm".
+    phrases = [
+        kw for kw in AI_HOOK_KEYWORDS if " " in kw and _command_word_matches(words, index, kw)
+    ]
+    keywords = phrases or [
+        kw for kw in AI_HOOK_KEYWORDS if " " not in kw and _command_word_matches(words, index, kw)
+    ]
+    if not keywords:
+        return None
+
+    token = words[index][1]
+    offset = words[index][0] + (len(token) - len(token.rsplit("/", 1)[-1]))
+    return offset, keywords
 
 
 def find_ai_invocations(line: str) -> List[Tuple[int, int, List[str]]]:
@@ -279,14 +328,11 @@ def find_ai_invocations(line: str) -> List[Tuple[int, int, List[str]]]:
         if not subcmd.strip() or _should_skip_subcommand(subcmd):
             continue
 
-        keywords = _subcommand_keyword_matches(subcmd)
-        if not keywords:
+        located = _locate_command_keyword(subcmd)
+        if located is None:
             continue
 
-        offset = _first_keyword_offset(subcmd, keywords)
-        if offset < 0:
-            continue
-
+        offset, keywords = located
         abs_start = seg_start + offset
         if quoted[abs_start]:
             # Quoted argument text (e.g. a commit message), not an invocation.

@@ -279,11 +279,9 @@ class TestGitHooks(unittest.TestCase):
         # Clean command
         self.assertEqual(has_ai_invocation("pytest tests/"), [])
 
-        # Multiple keywords in single line
-        self.assertEqual(
-            has_ai_invocation("gga run --provider opencode"),
-            ["gga", "opencode"],
-        )
+        # Only the command word counts: ``--provider opencode`` is an argument.
+        self.assertEqual(has_ai_invocation("gga run --provider opencode"), ["gga"])
+        self.assertEqual(has_ai_invocation("npm test && claude review"), ["claude"])
 
         # Case-insensitivity
         self.assertEqual(has_ai_invocation("OpenCode audit"), ["opencode"])
@@ -291,7 +289,7 @@ class TestGitHooks(unittest.TestCase):
 
         # Preserves AI_HOOK_KEYWORDS order regardless of appearance in line
         self.assertEqual(
-            has_ai_invocation("ollama or gemini or gentle-ai"),
+            has_ai_invocation("ollama serve && gemini audit && gentle-ai run"),
             ["gentle-ai", "gemini", "ollama"],
         )
 
@@ -433,6 +431,58 @@ class TestRewriteLineNeutralizingAI(unittest.TestCase):
         line, count = rewrite_line_neutralizing_ai("npm test && claude review\r\n")
         self.assertEqual(count, 1)
         self.assertTrue(line.endswith("\r\n"))
+
+
+class TestCommandPositionDetection(unittest.TestCase):
+    """A keyword only counts where a shell would actually run it: command position."""
+
+    def test_keyword_as_plain_argument_is_not_an_invocation(self):
+        # A1 finding 1: matching anywhere in the subcommand flagged read-only
+        # greps, and --fix-hooks then corrupted them into "grep -r true".
+        self.assertEqual(has_ai_invocation("grep -r claude docs"), [])
+        self.assertEqual(find_ai_invocations("grep -r claude docs\n"), [])
+        for line in ("grep -r claude docs\n", "rg claude-review notes/\n"):
+            self.assertEqual(rewrite_line_neutralizing_ai(line), (line, 0))
+
+    def test_argv0_keyword_is_still_flagged_and_neutralized(self):
+        self.assertEqual(has_ai_invocation("claude review"), ["claude"])
+        line, count = rewrite_line_neutralizing_ai("claude review\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "# [token-diet disabled]: claude review\n")
+        self.assertEqual(has_ai_invocation(line), [])
+
+    def test_wrapper_commands_are_looked_through(self):
+        self.assertEqual(has_ai_invocation("sudo claude review"), ["claude"])
+        self.assertEqual(has_ai_invocation("xargs claude"), ["claude"])
+        self.assertEqual(has_ai_invocation("command exec claude review"), ["claude"])
+        self.assertEqual(has_ai_invocation("env GGA_TOKEN=1 claude review"), ["claude"])
+        self.assertEqual(has_ai_invocation("nice -n 10 claude review"), ["claude"])
+        line, count = rewrite_line_neutralizing_ai("sudo claude review\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "sudo true  # [token-diet disabled: claude review]\n")
+
+    def test_env_assignment_prefixes_are_stripped(self):
+        # A1 finding 2: subcommands whose first token held "=" were skipped whole.
+        self.assertEqual(has_ai_invocation("FOO=1 claude review"), ["claude"])
+        self.assertEqual(has_ai_invocation("FOO=1 BAR=2 gga audit"), ["gga"])
+        self.assertEqual(has_ai_invocation("FOO=1"), [])
+        self.assertEqual(has_ai_invocation("FOO=1 grep -r claude docs"), [])
+        line, count = rewrite_line_neutralizing_ai("FOO=1 claude review\n")
+        self.assertEqual(count, 1)
+        self.assertEqual(line, "FOO=1 true  # [token-diet disabled: claude review]\n")
+
+    def test_added_keywords_match_at_command_position_only(self):
+        # A1/docs: documented targets that were never detected.
+        self.assertEqual(has_ai_invocation("codex exec --full-auto"), ["codex"])
+        self.assertEqual(has_ai_invocation("aider --yes"), ["aider"])
+        self.assertEqual(has_ai_invocation("cody chat hello"), ["cody"])
+        self.assertEqual(has_ai_invocation("grep -r codex docs"), [])
+        self.assertEqual(has_ai_invocation('git commit -m "codex review"'), [])
+
+    def test_llm_binary_match_keeps_the_llm_review_phrase(self):
+        self.assertEqual(has_ai_invocation("llm review"), ["llm review"])
+        self.assertEqual(has_ai_invocation("llm chat"), ["llm"])
+        self.assertEqual(has_ai_invocation("grep -r 'llm review' docs"), [])
 
 
 if __name__ == "__main__":
