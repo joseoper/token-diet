@@ -43,3 +43,8 @@ odd/
 
 # uv lockfile (not tracked)
 uv.lock
+
+# Local AI agent directives (pointers to odd/RULES.md, kept private)
+AGENTS.md
+CLAUDE.md
+
