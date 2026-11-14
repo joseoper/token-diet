@@ -564,7 +564,7 @@ class TestCliFlags(unittest.TestCase):
             with patch.object(sys, "stdin", fake_stdin):
                 code, out, err = self._run(["--fix-hooks", "--json"], cwd=tmp)
 
-            self.assertEqual(code, 0)
+            self.assertEqual(code, 1)
             self.assertIn("[y/N]", err)
             self.assertTrue(json.loads(out)["fix_hooks"]["aborted"])
             self.assertFalse(os.path.exists(hook + ".bak"))
@@ -628,6 +628,111 @@ class TestCliFlags(unittest.TestCase):
             self.assertIn("copilot-instructions.md", out)
             self.assertIn("Files Detected:  2 of 2", out)
 
+
+class TestRemediationT5(unittest.TestCase):
+    def _run(self, argv, cwd=None):
+        from token_diet import cli
+
+        out, err = io.StringIO(), io.StringIO()
+        code = 0
+        old_cwd = os.getcwd()
+        if cwd:
+            os.chdir(cwd)
+        try:
+            with patch.object(sys, "argv", ["token-diet"] + argv):
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    try:
+                        cli.main()
+                    except SystemExit as exc:
+                        code = exc.code if isinstance(exc.code, int) else 1
+        finally:
+            os.chdir(old_cwd)
+        return code, out.getvalue(), err.getvalue()
+    def test_resolve_target_paths_prunes_hidden_and_binaries(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            git_dir = os.path.join(tmp_dir, ".git")
+            os.makedirs(git_dir)
+            with open(os.path.join(git_dir, "HEAD"), "w") as f:
+                f.write("ref: refs/heads/main")
+            with open(os.path.join(tmp_dir, "pkg.whl"), "wb") as f:
+                f.write(b"PK\x03\x04")
+            venv = os.path.join(tmp_dir, "venv")
+            os.makedirs(venv)
+            with open(os.path.join(venv, "x.txt"), "w") as f:
+                f.write("x")
+            nm = os.path.join(tmp_dir, "node_modules")
+            os.makedirs(nm)
+            with open(os.path.join(nm, "y.txt"), "w") as f:
+                f.write("y")
+            with open(os.path.join(tmp_dir, "blob.txt"), "wb") as f:
+                f.write(b"a\x00b")
+            with open(os.path.join(tmp_dir, "AGENTS.md"), "w") as f:
+                f.write("hello")
+
+            paths = resolve_target_paths([tmp_dir])
+            self.assertTrue(any(p.endswith("AGENTS.md") for p in paths))
+            self.assertFalse(any(p.endswith("HEAD") for p in paths))
+            self.assertFalse(any(p.endswith("pkg.whl") for p in paths))
+            self.assertFalse(any("venv" + os.sep in p for p in paths))
+            self.assertFalse(any("node_modules" + os.sep in p for p in paths))
+            self.assertFalse(any(p.endswith("blob.txt") for p in paths))
+
+    def test_json_zero_baseline_emits_null_delta(self):
+        import json as _json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = os.path.join(tmp, "AGENTS.md")
+            with open(doc, "w") as f:
+                f.write("hello world")
+            baseline = os.path.join(tmp, "baseline.json")
+            with open(baseline, "w") as f:
+                _json.dump({"total_tokens": 0}, f)
+            code, out, _ = self._run(["--json", "--baseline", baseline, doc], cwd=tmp)
+            data = _json.loads(out)
+            bc = data["baseline_comparison"]
+            self.assertIsNone(bc["delta_percent"])
+            self.assertTrue(bc.get("indeterminate") or bc.get("delta_indeterminate"))
+        self.assertTrue(bc.get("indeterminate") or bc.get("delta_indeterminate"))
+
+    def test_fix_hooks_failure_exits_1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hooks_dir = os.path.join(tmp, ".git", "hooks")
+            os.makedirs(hooks_dir)
+            hook = os.path.join(hooks_dir, "pre-commit")
+            with open(hook, "w") as f:
+                f.write("#!/bin/sh\nclaude review\n")
+            with open(hook + ".bak", "w") as f:
+                f.write("old")
+            code, out, err = self._run(["--fix-hooks"], cwd=tmp)
+            self.assertEqual(code, 1)
+
+    def test_fix_hooks_noop_exits_0(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hooks_dir = os.path.join(tmp, ".git", "hooks")
+            os.makedirs(hooks_dir)
+            hook = os.path.join(hooks_dir, "pre-commit")
+            with open(hook, "w") as f:
+                f.write("#!/bin/sh\npytest tests/\n")
+            code, out, err = self._run(["--fix-hooks"], cwd=tmp)
+            self.assertEqual(code, 0)
+
+    def test_fix_hooks_does_not_clobber_existing_bak(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hooks_dir = os.path.join(tmp, ".git", "hooks")
+            os.makedirs(hooks_dir)
+            hook = os.path.join(hooks_dir, "pre-commit")
+            with open(hook, "w") as f:
+                f.write("#!/bin/sh\nclaude review\n")
+            bak = hook + ".bak"
+            with open(bak, "w") as f:
+                f.write("ORIGINAL BACKUP")
+            from token_diet import fix_git_hooks
+
+            res = fix_git_hooks(tmp, interactive=False)
+            self.assertFalse(res["fixed"])
+            self.assertEqual(res.get("error"), "Backup already exists")
+            with open(bak) as f:
+                self.assertEqual(f.read(), "ORIGINAL BACKUP")
 
 if __name__ == "__main__":
     unittest.main()

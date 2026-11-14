@@ -72,7 +72,7 @@ repos:
         pass_filenames: false
 ```
 
-*Because `token-diet` is pure Python standard library and evaluates in < 5ms, it adds zero noticeable latency to local commits while preventing oversized rule injections.*
+*Because `token-diet` is pure Python standard library and runs deterministically offline with no LLM calls, it adds zero noticeable latency to local commits while preventing oversized rule injections.*
 
 ---
 

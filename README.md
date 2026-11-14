@@ -31,7 +31,7 @@ This structural bloat **reduces available working context for actual code and di
 
 ## Real Terminal Audit in Action
 
-Running `token-diet` delivers an instant diagnostic with zero runtime LLM overhead (< 10 ms execution):
+Running `token-diet` delivers an instant diagnostic with zero runtime LLM overhead (deterministic, offline execution; no LLM calls):
 
 ![Token Diet Real Terminal Audit](assets/terminal_preview.png)
 
@@ -57,7 +57,7 @@ Files Detected:  2 of 2
 
 ## Quick 30-Second Install
 
-> **Compatibility:** Requires **Python >= 3.10** (`python3 --version`) and standard library only (0 external dependencies). Compatible with macOS, Linux, and Windows.
+> **Compatibility:** Requires **Python >= 3.10** (`python3 --version`) and standard library only (0 external dependencies). CI covers Linux (and macOS locally); Windows is untested.
 
 ### Homebrew (macOS & Linux)
 ```bash
@@ -114,7 +114,7 @@ token-diet --fix-hooks -y
 
 * **Runtime Gateways (LiteLLM, Portkey):** Operate downstream as network proxies. They are blind to local git hooks, uncommitted directives, or MCP schemas. By the time a gateway sees the payload, tokens have already been read from disk, serialized, and billed.
 * **Text Compressors (LLMLingua):** Use small models to drop tokens dynamically at runtime. This introduces inference latency, consumes GPU/CPU cycles, and risks corrupting code syntax, indentation, and architectural constraints.
-* **Token Diet:** Operates **at rest** as a static architectural auditor and deterministic CI gatekeeper. Zero dependencies, zero runtime LLM overhead (< 10 ms), and leaves application code completely untouched.
+* **Token Diet:** Operates **at rest** as a static architectural auditor and deterministic CI gatekeeper. Zero dependencies, zero runtime LLM overhead (deterministic, offline execution with no LLM calls), and leaves application code completely untouched.
 
 ---
 
@@ -135,7 +135,7 @@ Explore the complete documentation for advanced workflows, architecture, and CI 
 Contributions, issues, and feature requests are welcome. Review [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, development guidelines, and pull request workflows:
 
 ```bash
-# Run the test suite (131 deterministic tests)
+# Run the test suite (142 deterministic tests)
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 

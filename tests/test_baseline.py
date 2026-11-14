@@ -153,9 +153,10 @@ class TestCompareTokens(unittest.TestCase):
         self.assertEqual(res["baseline_tokens"], 0)
         self.assertEqual(res["current_tokens"], 500)
         self.assertEqual(res["delta_tokens"], 500)
-        self.assertEqual(res["delta_percent"], float("inf"))
+        self.assertIsNone(res["delta_percent"])
         self.assertEqual(res["direction"], "increase")
         self.assertTrue(res["indeterminate"])
+        self.assertTrue(res["delta_indeterminate"])
 
         res_zero = compare_tokens(0, 0)
         self.assertEqual(res_zero["delta_percent"], 0.0)
@@ -197,8 +198,9 @@ class TestCheckBudget(unittest.TestCase):
         res = check_budget(100, 0, 5.0)
         self.assertTrue(res["exceeded"])
         self.assertEqual(res["direction"], "increase")
-        self.assertEqual(res["delta_percent"], float("inf"))
+        self.assertIsNone(res["delta_percent"])
         self.assertTrue(res["indeterminate"])
+        self.assertTrue(res["delta_indeterminate"])
 
         res_zero = check_budget(0, 0, 5.0)
         self.assertFalse(res_zero["exceeded"])

@@ -136,14 +136,11 @@ token-diet --mcp
 # Fail build if any file triggers [WARN] or [ALERT]:
 token-diet --strict
 
-# Enforce a maximum token ceiling on any single directive:
+# Enforce a maximum token ceiling on the TOTAL across all targets:
 token-diet --max-tokens 1500
 
 # Compare against a baseline and fail on regressions:
 token-diet --baseline .token-diet-baseline.json --max-delta 10
-
-# Generate or update a baseline file:
-token-diet --save-baseline .token-diet-baseline.json
 ```
 
 ### Machine-Readable JSON Output (`--json`)

@@ -23,8 +23,8 @@ pipx upgrade token-diet-cli
 
 `token-diet` enforces strict security invariants in its codebase:
 1. **Zero Runtime Dependencies:** No third-party packages in `src/token_diet/` to prevent supply-chain compromises.
-2. **Repository Containment:** File mutations (`--fix-hooks`) are strictly bound within the repository's `.git/` directory. Symlink targets outside the repository boundary are rejected with `PermissionError`.
-3. **Atomic File Operations:** All file updates occur via temporary atomic files with strict permissions (`0o700` for hooks) to eliminate Time-of-Check to Time-of-Use (TOCTOU) races.
+2. **Repository Containment:** File mutations (`--fix-hooks`) are validated against the repository boundary. Hooks in the repository root and the common (shared) hooks directory are permitted; targets outside the repository boundary are rejected by returning an error result, not by raising `PermissionError`. Symlink traversal is blocked via `O_NOFOLLOW` and an inode re-check before atomic replace.
+3. **Atomic File Operations:** All file updates occur via temporary atomic files with `os.replace`. Hook file mode is preserved from the original (not forced to `0o700`), and an existing `<hook>.bak` backup is never clobbered. TOCTOU races are mitigated by an inode re-check before replace.
 4. **Denial of Service Limits:** File reads are bounded to 10 MB per file, preventing memory exhaustion attacks from unbounded pipes or infinite streams (e.g., `/dev/zero`).
 5. **Terminal Output Sanitization:** All terminal outputs sanitize ANSI escape sequences and control characters (`[\x00-\x08\x0b-\x1f\x7f]`) to prevent terminal spoofing.
 

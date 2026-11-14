@@ -9,7 +9,7 @@ Please be respectful, constructive, and considerate of all contributors and user
 ## Core Engineering Principles
 
 1. **Zero External Dependencies:** `src/token_diet/` strictly utilizes the Python standard library (`sys`, `os`, `json`, `argparse`, `typing`). Do not introduce third-party runtime dependencies.
-2. **Cross-Platform Compatibility:** Code must execute seamlessly across macOS, Linux, and Windows. Use standard path handling (`os.path.expanduser()`, `os.path.join`).
+2. **Cross-Platform Compatibility:** Code must use standard path handling (`os.path.expanduser()`, `os.path.join`). CI covers Linux (and macOS locally); Windows is untested, so platform-specific behavior should be guarded and reported as unverified on Windows.
 3. **Test-Driven Development (TDD):** Every bugfix, heuristic change, or new CLI flag must include accompanying automated unit tests under `tests/`:
    - Feature modules keep isolated unit tests in `tests/test_<module>.py`.
    - Cross-module wiring, threshold flags, and CLI arguments are tested in `tests/test_token_audit.py`.
@@ -81,6 +81,8 @@ An automated script is provided in `scripts/release.sh` to execute and validate 
    rm -rf dist/ build/ src/*.egg-info
    python3 -m build
    ```
+
+> **Identity:** Commits that will be published must use the public noreply identity, e.g. `git config user.email "joseoper@users.noreply.github.com"` (or set `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`) before release commits, so no personal email leaks into published history.
 
 4. **Commit, Tag, and Push to Public Remote:**
    ```bash

@@ -107,7 +107,7 @@ def compare_tokens(current_tokens: int, baseline_tokens: int) -> Dict[str, Any]:
         delta_percent = round(delta_tokens / baseline_tokens * 100.0, 2)
     elif baseline_tokens == 0:
         if current_tokens > 0:
-            delta_percent = float("inf")
+            delta_percent = None
             indeterminate = True
         else:
             delta_percent = 0.0
@@ -130,6 +130,7 @@ def compare_tokens(current_tokens: int, baseline_tokens: int) -> Dict[str, Any]:
     }
     if indeterminate:
         result["indeterminate"] = True
+        result["delta_indeterminate"] = True
 
     return result
 

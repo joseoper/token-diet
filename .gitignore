@@ -40,3 +40,6 @@ Thumbs.db
 
 # ODD orchestration artifacts (local only)
 odd/
+
+# uv lockfile (not tracked)
+uv.lock

@@ -428,10 +428,33 @@ def fix_git_hooks(
                 "error": "Symlink detected at backup path",
                 "message": f"Backup target is a symlink: {backup_path}. Refusing to write backup.",
             }
+        if os.path.lexists(backup_path):
+            return {
+                "fixed": False,
+                "hook_path": hook_path,
+                "backup_path": None,
+                "disabled_count": 0,
+                "modified_lines": 0,
+                "diff": "",
+                "error": "Backup already exists",
+                "message": f"Refusing to overwrite existing backup: {backup_path}.",
+            }
 
-        # Write backup safely (create or overwrite regular file safely with mode 0o600 or orig_stat)
-        backup_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-        backup_fd = os.open(backup_path, backup_flags, 0o600)
+        # Write backup safely (create, never clobber; refuse symlink targets)
+        backup_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            backup_fd = os.open(backup_path, backup_flags, 0o600)
+        except (FileExistsError, OSError) as e:
+            return {
+                "fixed": False,
+                "hook_path": hook_path,
+                "backup_path": None,
+                "disabled_count": 0,
+                "modified_lines": 0,
+                "diff": "",
+                "error": "Backup already exists",
+                "message": f"Refusing to overwrite existing backup: {backup_path}.",
+            }
         with os.fdopen(backup_fd, "w", encoding="utf-8") as f:
             f.writelines(lines)
 
@@ -486,6 +509,28 @@ def fix_git_hooks(
         }
 
 
+_PRUNED_DIR_NAMES = {".git", "node_modules", "__pycache__", "venv", ".venv", "env"}
+_BINARY_EXTENSIONS = {
+    ".whl", ".pyc", ".pyo", ".so", ".dll", ".exe", ".bin", ".zip",
+    ".tar", ".gz", ".tgz", ".png", ".jpg", ".jpeg", ".gif", ".pdf",
+    ".egg", ".wasm", ".o", ".a", ".class", ".jar",
+}
+
+
+def _is_binary_or_non_directive(path: str) -> bool:
+    ext = os.path.splitext(path)[1].lower()
+    if ext in _BINARY_EXTENSIONS:
+        return True
+    try:
+        with open(path, "rb") as f:
+            chunk = f.read(8192)
+        if b"\x00" in chunk:
+            return True
+    except OSError:
+        return True
+    return False
+
+
 def resolve_target_paths(input_paths: Optional[List[str]] = None, check_local: bool = True) -> List[str]:
     """Resolves file paths, expanding directories recursively or defaulting to local/global prompts."""
     if input_paths:
@@ -493,10 +538,18 @@ def resolve_target_paths(input_paths: Optional[List[str]] = None, check_local: b
         for p in input_paths:
             expanded = os.path.abspath(os.path.expanduser(p))
             if os.path.isdir(expanded):
-                for root, _, files in os.walk(expanded):
+                for root, dirs, files in os.walk(expanded):
+                    dirs[:] = sorted(
+                        d for d in dirs
+                        if not d.startswith(".") and d not in _PRUNED_DIR_NAMES
+                    )
                     for f in sorted(files):
-                        if not f.startswith("."):
-                            resolved.append(os.path.join(root, f))
+                        if f.startswith("."):
+                            continue
+                        full = os.path.join(root, f)
+                        if _is_binary_or_non_directive(full):
+                            continue
+                        resolved.append(full)
             else:
                 resolved.append(expanded)
         return resolved
@@ -545,6 +598,17 @@ def main():
     parser = argparse.ArgumentParser(
         prog="token-diet",
         description="Audit token footprint and detect silent context leaks in AI agent workflows.",
+    )
+    # Resolve version lazily from the package to keep a single source of truth.
+    try:
+        from token_diet import __version__ as _pkg_version
+    except Exception:
+        _pkg_version = "0.3.1"
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {_pkg_version}",
     )
     parser.add_argument(
         "paths",
@@ -638,6 +702,8 @@ def main():
             print("  • Safe pre-commit hook is active without silent token bleed.")
         else:
             print(yellow(f"ℹ️  {fix_result['message']}"))
+        if fix_result.get("error") or fix_result.get("aborted"):
+            sys.exit(1)
         return
 
     check_local = not args.global_only
